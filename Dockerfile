@@ -1,116 +1,21 @@
-# =============================================================================
-# Sub2API Multi-Stage Dockerfile
-# =============================================================================
-# Stage 1: Build frontend
-# Stage 2: Build Go backend with embedded frontend
-# Stage 3: Final minimal image
-# =============================================================================
+# 基础镜像：使用官方 Node.js 18 长期支持版（Alpine 轻量化版本）
+FROM node:18-alpine
 
-ARG NODE_IMAGE=node:24-alpine
-ARG GOLANG_IMAGE=golang:1.26.1-alpine
-ARG ALPINE_IMAGE=alpine:3.21
-ARG GOPROXY=https://goproxy.cn,direct
-ARG GOSUMDB=sum.golang.google.cn
-
-# -----------------------------------------------------------------------------
-# Stage 1: Frontend Builder
-# -----------------------------------------------------------------------------
-FROM ${NODE_IMAGE} AS frontend-builder
-
-WORKDIR /app/frontend
-
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
-# Install dependencies first (better caching)
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
-
-# Copy frontend source and build
-COPY frontend/ ./
-RUN pnpm run build
-
-# -----------------------------------------------------------------------------
-# Stage 2: Backend Builder
-# -----------------------------------------------------------------------------
-FROM ${GOLANG_IMAGE} AS backend-builder
-
-# Build arguments for version info (set by CI)
-ARG VERSION=
-ARG COMMIT=docker
-ARG DATE
-ARG GOPROXY
-ARG GOSUMDB
-
-ENV GOPROXY=${GOPROXY}
-ENV GOSUMDB=${GOSUMDB}
-
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata
-
-WORKDIR /app/backend
-
-# Copy go mod files first (better caching)
-COPY backend/go.mod backend/go.sum ./
-RUN go mod download
-
-# Copy backend source first
-COPY backend/ ./
-
-# Copy frontend dist from previous stage (must be after backend copy to avoid being overwritten)
-COPY --from=frontend-builder /app/backend/internal/web/dist ./internal/web/dist
-
-# Build the binary (BuildType=release for CI builds, embed frontend)
-# Version precedence: build arg VERSION > cmd/server/VERSION
-RUN VERSION_VALUE="${VERSION}" && \
-    if [ -z "${VERSION_VALUE}" ]; then VERSION_VALUE="$(tr -d '\r\n' < ./cmd/server/VERSION)"; fi && \
-    DATE_VALUE="${DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
-    CGO_ENABLED=0 GOOS=linux go build \
-    -tags embed \
-    -ldflags="-s -w -X main.Version=${VERSION_VALUE} -X main.Commit=${COMMIT} -X main.Date=${DATE_VALUE} -X main.BuildType=release" \
-    -trimpath \
-    -o /app/sub2api \
-    ./cmd/server
-
-# -----------------------------------------------------------------------------
-# Stage 3: Final Runtime Image
-# -----------------------------------------------------------------------------
-FROM ${ALPINE_IMAGE}
-
-# Labels
-LABEL maintainer="Wei-Shaw <github.com/Wei-Shaw>"
-LABEL description="Sub2API - AI API Gateway Platform"
-LABEL org.opencontainers.image.source="https://github.com/Wei-Shaw/sub2api"
-
-# Install runtime dependencies
-RUN apk add --no-cache \
-    ca-certificates \
-    tzdata \
-    && rm -rf /var/cache/apk/*
-
-# Create non-root user
-RUN addgroup -g 1000 sub2api && \
-    adduser -u 1000 -G sub2api -s /bin/sh -D sub2api
-
-# Set working directory
+# 设置工作目录
 WORKDIR /app
 
-# Copy binary/resources with ownership to avoid extra full-layer chown copy
-COPY --from=backend-builder --chown=sub2api:sub2api /app/sub2api /app/sub2api
-COPY --from=backend-builder --chown=sub2api:sub2api /app/backend/resources /app/resources
+# 复制 package.json 和 package-lock.json（优先安装依赖，利用 Docker 缓存）
+COPY package*.json ./
 
-# Create data directory
-RUN mkdir -p /app/data && chown sub2api:sub2api /app/data
+# 安装依赖（Alpine 需先安装 git，因为 Sub2API 依赖含 git 包）
+RUN apk add --no-cache git && \
+    npm install --production
 
-# Switch to non-root user
-USER sub2api
+# 复制所有源代码到工作目录
+COPY . .
 
-# Expose port (can be overridden by SERVER_PORT env var)
-EXPOSE 8080
+# 暴露端口（必须与 Sub2API 配置的 PORT 一致，默认 3000）
+EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD wget -q -T 5 -O /dev/null http://localhost:${SERVER_PORT:-8080}/health || exit 1
-
-# Run the application
-ENTRYPOINT ["/app/sub2api"]
+# 启动命令（生产环境启动）
+CMD ["npm", "run", "start:prod"]
