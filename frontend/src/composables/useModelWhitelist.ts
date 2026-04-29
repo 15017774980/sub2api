@@ -310,7 +310,7 @@ const bedrockPresetMappings = [
 
 // Antigravity 默认映射（从后端 API 获取，与 constants.go 保持一致）
 // 使用 fetchAntigravityDefaultMappings() 异步获取
-import { getAntigravityDefaultModelMapping } from '@/api/admin/accounts'
+import { getAntigravityDefaultModelMapping, getOpenAIDefaultModelMapping } from '@/api/admin/accounts'
 
 let _antigravityDefaultMappingsCache: { from: string; to: string }[] | null = null
 
@@ -326,6 +326,23 @@ export async function fetchAntigravityDefaultMappings(): Promise<{ from: string;
     _antigravityDefaultMappingsCache = []
   }
   return _antigravityDefaultMappingsCache
+}
+
+// OpenAI 默认映射（codex 系列，适用 ChatGPT Plus 订阅；与 backend constants.go 保持一致）
+let _openaiDefaultMappingsCache: { from: string; to: string }[] | null = null
+
+export async function fetchOpenAIDefaultMappings(): Promise<{ from: string; to: string }[]> {
+  if (_openaiDefaultMappingsCache !== null) {
+    return _openaiDefaultMappingsCache
+  }
+  try {
+    const mapping = await getOpenAIDefaultModelMapping()
+    _openaiDefaultMappingsCache = Object.entries(mapping).map(([from, to]) => ({ from, to }))
+  } catch (e) {
+    console.warn('[fetchOpenAIDefaultMappings] API failed, using empty fallback', e)
+    _openaiDefaultMappingsCache = []
+  }
+  return _openaiDefaultMappingsCache
 }
 
 // =====================

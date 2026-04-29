@@ -147,6 +147,45 @@
             <Icon name="cloud" size="sm" />
             Antigravity
           </button>
+          <button
+            type="button"
+            @click="form.platform = 'deepseek'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'deepseek'
+                ? 'bg-white text-cyan-600 shadow-sm dark:bg-dark-600 dark:text-cyan-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="deepseek" size="sm" />
+            DeepSeek
+          </button>
+          <button
+            type="button"
+            @click="form.platform = 'kimi'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'kimi'
+                ? 'bg-white text-amber-600 shadow-sm dark:bg-dark-600 dark:text-amber-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="kimi" size="sm" />
+            Kimi
+          </button>
+          <button
+            type="button"
+            @click="form.platform = 'mimo'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'mimo'
+                ? 'bg-white text-orange-600 shadow-sm dark:bg-dark-600 dark:text-orange-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="mimo" size="sm" />
+            MiMo
+          </button>
         </div>
       </div>
 
@@ -703,8 +742,11 @@
         </div>
       </div>
 
-      <!-- Upstream config (only for Antigravity upstream type) -->
-      <div v-if="form.platform === 'antigravity' && antigravityAccountType === 'upstream'" class="space-y-4">
+      <!-- Upstream config (Antigravity upstream type or DeepSeek) -->
+      <div
+        v-if="(form.platform === 'antigravity' && antigravityAccountType === 'upstream') || form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'mimo'"
+        class="space-y-4"
+      >
         <div>
           <label class="input-label">{{ t('admin.accounts.upstream.baseUrl') }}</label>
           <input
@@ -712,7 +754,7 @@
             type="text"
             required
             class="input"
-            placeholder="https://cloudcode-pa.googleapis.com"
+            :placeholder="form.platform === 'deepseek' ? 'https://api.deepseek.com/anthropic' : form.platform === 'kimi' ? 'https://api.moonshot.ai/anthropic' : form.platform === 'mimo' ? 'https://api.xiaomimimo.com/anthropic' : 'https://cloudcode-pa.googleapis.com'"
           />
           <p class="input-hint">{{ t('admin.accounts.upstream.baseUrlHint') }}</p>
         </div>
@@ -2938,6 +2980,7 @@ import {
   commonErrorCodes,
   buildModelMappingObject,
   fetchAntigravityDefaultMappings,
+  fetchOpenAIDefaultMappings,
   isValidWildcardPattern
 } from '@/composables/useModelWhitelist'
 import { useAuthStore } from '@/stores/auth'
@@ -3389,6 +3432,15 @@ watch(
         antigravityModelMappings.value = []
         antigravityModelRestrictionMode.value = 'mapping'
       }
+      // OpenAI: ChatGPT Plus 订阅 OAuth 类型默认填入 codex 系列映射，admin 可保留/修改
+      if (form.platform === 'openai' && modelMappings.value.length === 0) {
+        fetchOpenAIDefaultMappings().then(mappings => {
+          // 双重检查：异步返回时若用户已手动添加过 mapping，不要覆盖
+          if (modelMappings.value.length === 0) {
+            modelMappings.value = [...mappings]
+          }
+        })
+      }
     } else {
       resetForm()
     }
@@ -3446,6 +3498,15 @@ watch(
       antigravityWhitelistModels.value = []
       antigravityModelMappings.value = []
       antigravityModelRestrictionMode.value = 'mapping'
+    }
+    // OpenAI: ChatGPT Plus 订阅默认填入 codex 系列映射（前置已经清空 modelMappings）
+    if (newPlatform === 'openai') {
+      fetchOpenAIDefaultMappings().then(mappings => {
+        // 平台切换后用户可能立刻手动改 mapping，仅在仍然为空时才注入
+        if (modelMappings.value.length === 0 && form.platform === 'openai') {
+          modelMappings.value = [...mappings]
+        }
+      })
     }
     // Reset Bedrock fields when switching platforms
     bedrockAccessKeyId.value = ''
@@ -4081,6 +4142,63 @@ const handleSubmit = async () => {
     applyInterceptWarmup(credentials, interceptWarmupRequests.value, 'create')
 
     await createAccountAndFinish('anthropic', 'bedrock' as AccountType, credentials)
+    return
+  }
+
+  // For DeepSeek (only upstream apikey path), create directly
+  if (form.platform === 'deepseek') {
+    if (!form.name.trim()) {
+      appStore.showError(t('admin.accounts.pleaseEnterAccountName'))
+      return
+    }
+    if (!upstreamApiKey.value.trim()) {
+      appStore.showError(t('admin.accounts.upstream.pleaseEnterApiKey'))
+      return
+    }
+    const credentials: Record<string, unknown> = {
+      base_url: upstreamBaseUrl.value.trim() || 'https://api.deepseek.com/anthropic',
+      api_key: upstreamApiKey.value.trim()
+    }
+    applyInterceptWarmup(credentials, interceptWarmupRequests.value, 'create')
+    await createAccountAndFinish(form.platform, 'apikey', credentials)
+    return
+  }
+
+  // For Kimi (Moonshot, only upstream apikey path), create directly
+  if (form.platform === 'kimi') {
+    if (!form.name.trim()) {
+      appStore.showError(t('admin.accounts.pleaseEnterAccountName'))
+      return
+    }
+    if (!upstreamApiKey.value.trim()) {
+      appStore.showError(t('admin.accounts.upstream.pleaseEnterApiKey'))
+      return
+    }
+    const credentials: Record<string, unknown> = {
+      base_url: upstreamBaseUrl.value.trim() || 'https://api.moonshot.ai/anthropic',
+      api_key: upstreamApiKey.value.trim()
+    }
+    applyInterceptWarmup(credentials, interceptWarmupRequests.value, 'create')
+    await createAccountAndFinish(form.platform, 'apikey', credentials)
+    return
+  }
+
+  // For Xiaomi MiMo (only upstream apikey path), create directly
+  if (form.platform === 'mimo') {
+    if (!form.name.trim()) {
+      appStore.showError(t('admin.accounts.pleaseEnterAccountName'))
+      return
+    }
+    if (!upstreamApiKey.value.trim()) {
+      appStore.showError(t('admin.accounts.upstream.pleaseEnterApiKey'))
+      return
+    }
+    const credentials: Record<string, unknown> = {
+      base_url: upstreamBaseUrl.value.trim() || 'https://api.xiaomimimo.com/anthropic',
+      api_key: upstreamApiKey.value.trim()
+    }
+    applyInterceptWarmup(credentials, interceptWarmupRequests.value, 'create')
+    await createAccountAndFinish(form.platform, 'apikey', credentials)
     return
   }
 

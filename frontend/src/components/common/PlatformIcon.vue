@@ -19,6 +19,18 @@
   <svg v-else-if="platform === 'antigravity'" :class="sizeClass" viewBox="0 0 24 24" fill="currentColor">
     <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" />
   </svg>
+  <!-- DeepSeek logo (递减层次条，象征 deep) -->
+  <svg v-else-if="platform === 'deepseek'" :class="sizeClass" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M3 6h18v2H3zm2 5h14v2H5zm3 5h8v2H8z" />
+  </svg>
+  <!-- Kimi logo (圆形对话气泡风格) -->
+  <svg v-else-if="platform === 'kimi'" :class="sizeClass" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.59 1.38 5.08L2 22l4.92-1.38A9.953 9.953 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm-3 12H7v-4h2v4zm4 0h-2V8h2v6zm4 0h-2V10h2v4z" />
+  </svg>
+  <!-- MiMo logo (M 字母风格) -->
+  <svg v-else-if="platform === 'mimo'" :class="sizeClass" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M3 4h3l3 6 3-6h3v16h-3v-9l-3 6-3-6v9H3V4zm15 0h3v16h-3V4z" />
+  </svg>
   <!-- Fallback: generic platform icon -->
   <svg v-else :class="sizeClass" fill="currentColor" viewBox="0 0 24 24">
     <path

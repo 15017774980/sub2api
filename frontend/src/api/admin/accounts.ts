@@ -556,6 +556,18 @@ export async function getAntigravityDefaultModelMapping(): Promise<Record<string
 }
 
 /**
+ * Get OpenAI default model mapping from backend (codex series for ChatGPT Plus subscription).
+ * Not suitable for official OpenAI API accounts — those don't accept codex model names.
+ * @returns Default model mapping (claude-* -> gpt-5.3-codex / gpt-5.3-codex-spark)
+ */
+export async function getOpenAIDefaultModelMapping(): Promise<Record<string, string>> {
+  const { data } = await apiClient.get<Record<string, string>>(
+    '/admin/accounts/openai/default-model-mapping'
+  )
+  return data
+}
+
+/**
  * Refresh OpenAI token using refresh token
  * @param refreshToken - The refresh token
  * @param proxyId - Optional proxy ID
@@ -661,6 +673,7 @@ export const accountsAPI = {
   exportData,
   importData,
   getAntigravityDefaultModelMapping,
+  getOpenAIDefaultModelMapping,
   batchClearError,
   batchRefresh,
   setPrivacy
