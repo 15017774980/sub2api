@@ -3178,6 +3178,12 @@ func getAccountPlatform(accountPlatform string) string {
 		return "Antigravity"
 	case PlatformAnthropic, "claude":
 		return "Anthropic"
+	case PlatformDeepSeek:
+		return "DeepSeek"
+	case PlatformKimi:
+		return "Kimi"
+	case PlatformMiMo:
+		return "MiMo"
 	default:
 		return ""
 	}

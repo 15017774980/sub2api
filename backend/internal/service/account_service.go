@@ -419,6 +419,15 @@ func (s *AccountService) TestCredentials(ctx context.Context, id int64) error {
 	case PlatformGemini:
 		// TODO: 测试Gemini API凭证
 		return nil
+	case PlatformDeepSeek:
+		// TODO: 测试 DeepSeek API 凭证（走 Anthropic 兼容 endpoint）
+		return nil
+	case PlatformKimi:
+		// TODO: 测试 Kimi (Moonshot) API 凭证（走 Anthropic 兼容 endpoint）
+		return nil
+	case PlatformMiMo:
+		// TODO: 测试 Xiaomi MiMo API 凭证（走 Anthropic 兼容 endpoint）
+		return nil
 	default:
 		return fmt.Errorf("unsupported platform: %s", account.Platform)
 	}

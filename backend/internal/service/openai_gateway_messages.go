@@ -34,12 +34,20 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 ) (*OpenAIForwardResult, error) {
 	startTime := time.Now()
 
+	// OpenAI 上游身份伪装：仅 user 角色 + openai 平台时挂载（admin 透传）。
+	// 仅 claude-* 入站时注入 Claude 身份提示——gpt-* 入站说明用户明确想要 GPT 行为，
+	// 不该注入。函数内部已做 model 判断。
+	body = MaybeInjectClaudeIdentityForOpenAI(body)
+
 	// 1. Parse Anthropic request
 	var anthropicReq apicompat.AnthropicRequest
 	if err := json.Unmarshal(body, &anthropicReq); err != nil {
 		return nil, fmt.Errorf("parse anthropic request: %w", err)
 	}
 	originalModel := anthropicReq.Model
+	// 此时拿到 originalModel，正式开启 disguise context（生成合成 message id 等）。
+	// admin / 非 openai 平台静默 no-op。
+	SetOpenAIDisguiseContext(c, account, originalModel)
 	applyOpenAICompatModelNormalization(&anthropicReq)
 	normalizedModel := anthropicReq.Model
 	clientStream := anthropicReq.Stream // client's original stream preference
@@ -364,6 +372,10 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 
 	anthropicResp := apicompat.ResponsesToAnthropic(finalResponse, originalModel)
 
+	// OpenAI 上游身份伪装：把 anthropic 响应里的 id（resp_xxx / chatcmpl-xxx）改写为合成 msg_xxx。
+	// admin / 非 openai 平台静默 no-op。
+	MaybeRewriteAnthropicResponseID(c, anthropicResp)
+
 	if s.responseHeaderFilter != nil {
 		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 	}
@@ -472,6 +484,9 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 				)
 				continue
 			}
+			// OpenAI 上游身份伪装：改写 message_start.message.id（resp_xxx / chatcmpl-xxx → msg_xxx）。
+			// admin / 非 openai 平台或非 message_start 事件，函数自身 no-op 透传。
+			sse = MaybeDisguiseAnthropicSSELineForOpenAI(c, sse)
 			if _, err := fmt.Fprint(c.Writer, sse); err != nil {
 				logger.L().Info("openai messages stream: client disconnected",
 					zap.String("request_id", requestID),

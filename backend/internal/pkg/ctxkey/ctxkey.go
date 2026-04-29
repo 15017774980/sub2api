@@ -55,4 +55,8 @@ const (
 
 	// ClaudeCodeVersion stores the extracted Claude Code version from User-Agent (e.g. "2.1.22")
 	ClaudeCodeVersion Key = "ctx_claude_code_version"
+
+	// DisguisedMessageID 当 deepseek 上游伪装启用时，本次请求合成的 anthropic 风格 message id。
+	// resolveUsageBillingRequestID 优先读它，保证 user 视角下 response.id 与 usage_log.request_id 一致。
+	DisguisedMessageID Key = "ctx_disguised_message_id"
 )

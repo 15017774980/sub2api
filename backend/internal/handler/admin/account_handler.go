@@ -2137,6 +2137,13 @@ func (h *AccountHandler) GetAntigravityDefaultModelMapping(c *gin.Context) {
 	response.Success(c, domain.DefaultAntigravityModelMapping)
 }
 
+// GetOpenAIDefaultModelMapping 获取 OpenAI 平台的默认模型映射（codex 系列，
+// 适用 ChatGPT Plus 订阅 OAuth 类型账号；接入官方 OpenAI API 时不要用此 mapping）。
+// GET /api/v1/admin/accounts/openai/default-model-mapping
+func (h *AccountHandler) GetOpenAIDefaultModelMapping(c *gin.Context) {
+	response.Success(c, domain.DefaultOpenAIModelMapping)
+}
+
 // sanitizeExtraBaseRPM 对 extra map 中的 base_rpm 值进行范围校验和归一化。
 // 负值归零，超过 10000 截断为 10000。extra 为 nil 或不含 base_rpm 时无操作。
 func sanitizeExtraBaseRPM(extra map[string]any) {

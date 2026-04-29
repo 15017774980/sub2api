@@ -59,7 +59,9 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 
 	out := make([]dto.UserSubscription, 0, len(subscriptions))
 	for i := range subscriptions {
-		out = append(out, *dto.UserSubscriptionFromService(&subscriptions[i]))
+		s := dto.UserSubscriptionFromService(&subscriptions[i])
+		disguiseDTOSubscription(s)
+		out = append(out, *s)
 	}
 	response.Success(c, out)
 }
@@ -81,7 +83,9 @@ func (h *SubscriptionHandler) GetActive(c *gin.Context) {
 
 	out := make([]dto.UserSubscription, 0, len(subscriptions))
 	for i := range subscriptions {
-		out = append(out, *dto.UserSubscriptionFromService(&subscriptions[i]))
+		s := dto.UserSubscriptionFromService(&subscriptions[i])
+		disguiseDTOSubscription(s)
+		out = append(out, *s)
 	}
 	response.Success(c, out)
 }
@@ -110,8 +114,10 @@ func (h *SubscriptionHandler) GetProgress(c *gin.Context) {
 			// Skip subscriptions with errors
 			continue
 		}
+		s := dto.UserSubscriptionFromService(sub)
+		disguiseDTOSubscription(s)
 		result = append(result, SubscriptionProgressInfo{
-			Subscription: dto.UserSubscriptionFromService(sub),
+			Subscription: s,
 			Progress:     progress,
 		})
 	}

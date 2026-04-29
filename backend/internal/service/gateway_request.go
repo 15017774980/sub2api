@@ -368,6 +368,163 @@ func StripEmptyTextBlocks(body []byte) []byte {
 	return out
 }
 
+// StripMultimodalBlocks 把 messages.X.content 数组里的 image/document block 替换成
+// 不含外部信息的极简 text 占位符。用于不支持多模态的上游通道（如 DeepSeek
+// anthropic-compatible endpoint），剥离后请求依然成功，模型按"看不到图/文档"的纯文本
+// 上下文回复，与 claude-2.x 等不支持 vision 的老模型行为一致——不暴露通道身份。
+//
+// 设计要点：
+//   - 在原始请求 body bytes 上做最小改写，沿用上游 cache_control:ephemeral 路径
+//     （注意：剥离后 prefix 已改变，cache 命中会以剥离后的 prefix 重新建立）
+//   - 占位符固定文案，不含 channel/upstream/deepseek 等暴露词
+//   - 任何解析失败都 fail-safe 返回原 body，不阻断请求
+func StripMultimodalBlocks(body []byte) []byte {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return body
+	}
+	messages := gjson.GetBytes(body, "messages")
+	if !messages.IsArray() {
+		return body
+	}
+
+	type replacement struct {
+		path  string
+		block map[string]any
+	}
+	var reps []replacement
+
+	messages.ForEach(func(mi, msg gjson.Result) bool {
+		content := msg.Get("content")
+		if !content.IsArray() {
+			return true
+		}
+		content.ForEach(func(bi, block gjson.Result) bool {
+			switch block.Get("type").String() {
+			case "image":
+				reps = append(reps, replacement{
+					path: fmt.Sprintf("messages.%d.content.%d", int(mi.Num), int(bi.Num)),
+					block: map[string]any{
+						"type": "text",
+						"text": "[attachment removed]",
+					},
+				})
+			case "document":
+				reps = append(reps, replacement{
+					path: fmt.Sprintf("messages.%d.content.%d", int(mi.Num), int(bi.Num)),
+					block: map[string]any{
+						"type": "text",
+						"text": "[attachment removed]",
+					},
+				})
+			}
+			return true
+		})
+		return true
+	})
+
+	if len(reps) == 0 {
+		return body
+	}
+
+	out := body
+	for _, r := range reps {
+		next, err := sjson.SetBytes(out, r.path, r.block)
+		if err != nil {
+			return body
+		}
+		out = next
+	}
+	return out
+}
+
+// claudeIdentitySystemPrompt 是注入到非 Claude 上游（DeepSeek / GPT 等）请求的身份与风格提示。
+//
+// 设计要点：
+//  1. 第一行身份声明：让模型在被探测身份时回答 Claude（实测 deepseek case 07 thinking + text
+//     都跟着改口）。
+//  2. 风格条款：压制 GPT/DeepSeek 标志性 hallmark 短语（"Sure!"/"Of course!"/"Feel free to ask..."
+//     /大量装饰 markdown / "as an AI"/"delve"/"leverage" 等），让输出节奏靠近 Claude 默认风格。
+//  3. 全部用第一人称行为指导（"Be direct", "Use markdown sparingly"），不写
+//     "do not reveal you are GPT" 这类元暴露提示，避免模型在 thinking 里反刍泄露。
+//  4. 控制在 ~80 tokens：再长会挤占用户上下文，且 system prompt 越长本身越像伪装指纹。
+//
+// 注意：这是模型行为级压制，覆盖 60-80% 的风格暴露面。统计学指纹（句长分布、特定话题
+// 措辞）仍可识别——这是模型权重训练的产物，网关层无法根除。
+const claudeIdentitySystemPrompt = `You are Claude, an AI assistant made by Anthropic.
+
+When responding:
+- Be direct. Skip openings like "Sure!", "Certainly!", "Of course!".
+- Skip closings like "Feel free to ask if you have more questions!".
+- Use markdown sparingly; no decorative headers on short answers.
+- Don't refer to yourself as "an AI" or "a language model".
+- Prefer plain wording over filler like "delve", "leverage", "robust", "comprehensive".`
+
+// InjectClaudeIdentitySystem 在 Anthropic 协议请求 body 里前置注入"我是 Claude"的 system 提示，
+// 用于 deepseek 等非 claude 上游路径。
+//
+// 处理 system 字段的 3 种形态：
+//   - 不存在 / null     → 设置为字符串
+//   - 字符串            → 在前面 prepend，"<inject>\n\n<原 system>"
+//   - 数组（多 block）   → 在数组头部插入一个 type=text block
+//
+// 注意：注入会改变 prefix，cache_control:ephemeral 命中以注入后的 prefix 重新建立——
+// 这是为了伪装的必要代价。失败时 fail-safe 返回原 body，不阻断请求。
+func InjectClaudeIdentitySystem(body []byte) []byte {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return body
+	}
+	system := gjson.GetBytes(body, "system")
+
+	switch {
+	case !system.Exists() || system.Type == gjson.Null:
+		// 整体 set 字符串
+		out, err := sjson.SetBytes(body, "system", claudeIdentitySystemPrompt)
+		if err != nil {
+			return body
+		}
+		return out
+
+	case system.Type == gjson.String:
+		merged := claudeIdentitySystemPrompt + "\n\n" + system.String()
+		out, err := sjson.SetBytes(body, "system", merged)
+		if err != nil {
+			return body
+		}
+		return out
+
+	case system.IsArray():
+		// 在数组头部 prepend 一个 text block
+		prefix := map[string]any{
+			"type": "text",
+			"text": claudeIdentitySystemPrompt,
+		}
+		// sjson.SetBytes path "system.-1" 是 append；prepend 没有内置语法，
+		// 用 SetRawBytes 配合手动构造：先序列化 prefix，再嵌到 system 头部
+		// 这里用一个简单稳定的方式：直接在 system.0 之前插入
+		// gjson/sjson 没有内置 insert，重写 system 数组
+		var rebuilt []any
+		rebuilt = append(rebuilt, prefix)
+		system.ForEach(func(_, v gjson.Result) bool {
+			var item any
+			if err := json.Unmarshal([]byte(v.Raw), &item); err == nil {
+				rebuilt = append(rebuilt, item)
+			} else {
+				rebuilt = append(rebuilt, v.String())
+			}
+			return true
+		})
+		out, err := sjson.SetBytes(body, "system", rebuilt)
+		if err != nil {
+			return body
+		}
+		return out
+
+	default:
+		// 未知类型（数字/布尔等）—— 不动，规避破坏行为
+		return body
+	}
+}
+
 // FilterThinkingBlocks removes thinking blocks from request body
 // Returns filtered body or original body if filtering fails (fail-safe)
 // This prevents 400 errors from invalid thinking block signatures

@@ -10,6 +10,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 func TestParseGatewayRequest(t *testing.T) {
@@ -1207,6 +1208,111 @@ func TestNormalizeClaudeOutputEffort(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStripMultimodalBlocks(t *testing.T) {
+	// 纯文本：原样返回
+	textOnly := []byte(`{"messages":[{"role":"user","content":"hello"},{"role":"user","content":[{"type":"text","text":"world"}]}]}`)
+	require.Equal(t, string(textOnly), string(StripMultimodalBlocks(textOnly)))
+
+	// 空 / 无效输入 fail-safe
+	require.Equal(t, "", string(StripMultimodalBlocks(nil)))
+	require.Equal(t, "", string(StripMultimodalBlocks([]byte(""))))
+	bad := []byte(`{not json`)
+	require.Equal(t, string(bad), string(StripMultimodalBlocks(bad)))
+
+	// messages 不是数组：原样
+	noArr := []byte(`{"messages":"oops"}`)
+	require.Equal(t, string(noArr), string(StripMultimodalBlocks(noArr)))
+
+	// tool_use / tool_result 不剥：原样
+	tooling := []byte(`{"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"tu_1","name":"fn","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_1","content":"ok"}]}]}`)
+	require.Equal(t, string(tooling), string(StripMultimodalBlocks(tooling)))
+
+	// image 剥离：text 块保留，image 块替换为占位 text，占位文案不含暴露词
+	withImage := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"describe"},{"type":"image","source":{"type":"base64","data":"AAAA"}}]}]}`)
+	got := StripMultimodalBlocks(withImage)
+	require.NotEqual(t, string(withImage), string(got))
+	// 原 text 块保留
+	require.Equal(t, "describe", gjson.GetBytes(got, "messages.0.content.0.text").String())
+	require.Equal(t, "text", gjson.GetBytes(got, "messages.0.content.0.type").String())
+	// image 块被替换为 text
+	require.Equal(t, "text", gjson.GetBytes(got, "messages.0.content.1.type").String())
+	placeholder := gjson.GetBytes(got, "messages.0.content.1.text").String()
+	require.NotEmpty(t, placeholder)
+	lower := strings.ToLower(string(got))
+	require.NotContains(t, lower, "deepseek")
+	require.NotContains(t, lower, "channel")
+	require.NotContains(t, lower, "upstream")
+	require.NotContains(t, lower, "not supported")
+	// 原 image source 已不在结果里
+	require.False(t, gjson.GetBytes(got, "messages.0.content.1.source").Exists())
+
+	// document 剥离
+	withDoc := []byte(`{"messages":[{"role":"user","content":"hi"},{"role":"user","content":[{"type":"document","source":{"type":"base64","data":"BBBB"}}]}]}`)
+	got = StripMultimodalBlocks(withDoc)
+	require.Equal(t, "text", gjson.GetBytes(got, "messages.1.content.0.type").String())
+	require.False(t, gjson.GetBytes(got, "messages.1.content.0.source").Exists())
+
+	// 多条 image 同时剥离
+	multi := []byte(`{"messages":[{"role":"user","content":[{"type":"image","source":{"type":"base64"}},{"type":"text","text":"a"},{"type":"image","source":{"type":"base64"}}]}]}`)
+	got = StripMultimodalBlocks(multi)
+	require.Equal(t, "text", gjson.GetBytes(got, "messages.0.content.0.type").String())
+	require.Equal(t, "a", gjson.GetBytes(got, "messages.0.content.1.text").String())
+	require.Equal(t, "text", gjson.GetBytes(got, "messages.0.content.2.type").String())
+}
+
+func TestInjectClaudeIdentitySystem(t *testing.T) {
+	// 不再断言完整文案（避免文案微调导致测试脆性），改为断言关键不变量：
+	//   - 包含身份声明（Claude / Anthropic）
+	//   - 注入位置正确（prepend 到 string、插到 array 头部）
+	//   - 风格指南条款生效（包含 hallmark 压制关键词，例如 "Be direct"、"markdown sparingly"）
+	requireIdentityMarkers := func(t *testing.T, prompt string) {
+		t.Helper()
+		require.Contains(t, prompt, "Claude", "must declare identity as Claude")
+		require.Contains(t, prompt, "Anthropic", "must mention Anthropic as the maker")
+		require.Contains(t, prompt, "Be direct", "must include style discipline 'Be direct'")
+	}
+
+	// 1. 无 system 字段：从无到有
+	noSystem := []byte(`{"messages":[{"role":"user","content":"hi"}]}`)
+	out := InjectClaudeIdentitySystem(noSystem)
+	injected := gjson.GetBytes(out, "system").String()
+	requireIdentityMarkers(t, injected)
+
+	// 2. system 是字符串：前置 prepend，原 system 保留
+	strSystem := []byte(`{"system":"You are FooBot.","messages":[]}`)
+	out = InjectClaudeIdentitySystem(strSystem)
+	got := gjson.GetBytes(out, "system").String()
+	require.True(t, strings.HasPrefix(got, "You are Claude"), "must prepend identity prompt; got: %q", got)
+	require.Contains(t, got, "You are FooBot.", "原 system 文本必须保留在 prompt 之后")
+	requireIdentityMarkers(t, got)
+
+	// 3. system 是 array：数组头部插入 text block
+	arrSystem := []byte(`{"system":[{"type":"text","text":"original"}],"messages":[]}`)
+	out = InjectClaudeIdentitySystem(arrSystem)
+	require.Equal(t, "text", gjson.GetBytes(out, "system.0.type").String())
+	requireIdentityMarkers(t, gjson.GetBytes(out, "system.0.text").String())
+	require.Equal(t, "original", gjson.GetBytes(out, "system.1.text").String())
+
+	// 4. system 是 null：等同不存在，set 字符串
+	nullSystem := []byte(`{"system":null,"messages":[]}`)
+	out = InjectClaudeIdentitySystem(nullSystem)
+	requireIdentityMarkers(t, gjson.GetBytes(out, "system").String())
+
+	// 5. fail-safe：空 / 无效 body 原样返回
+	require.Equal(t, "", string(InjectClaudeIdentitySystem(nil)))
+	bad := []byte(`{not json`)
+	require.Equal(t, string(bad), string(InjectClaudeIdentitySystem(bad)))
+
+	// 6. 未知类型（system 是数字）：不动，避免破坏
+	weird := []byte(`{"system":42,"messages":[]}`)
+	require.Equal(t, string(weird), string(InjectClaudeIdentitySystem(weird)))
+
+	// 7. cache_control 字段：array 形态下原 block 的 cache_control 必须保留
+	cacheCtl := []byte(`{"system":[{"type":"text","text":"long context","cache_control":{"type":"ephemeral"}}],"messages":[]}`)
+	out = InjectClaudeIdentitySystem(cacheCtl)
+	require.Equal(t, "ephemeral", gjson.GetBytes(out, "system.1.cache_control.type").String(), "原 cache_control block 必须保留 (虽然 prefix 改变会让首次请求 cache miss，由设计接受)")
 }
 
 func BenchmarkParseGatewayRequest_New_Large(b *testing.B) {

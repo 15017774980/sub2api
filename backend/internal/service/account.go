@@ -482,6 +482,22 @@ func (a *Account) resolveModelMapping(rawMapping map[string]any) map[string]stri
 		if a.Platform == domain.PlatformAntigravity {
 			return domain.DefaultAntigravityModelMapping
 		}
+		// DeepSeek 平台使用默认映射（Anthropic 协议入站 → DeepSeek 真实模型名）
+		if a.Platform == domain.PlatformDeepSeek {
+			return domain.DefaultDeepSeekModelMapping
+		}
+		// Kimi 平台使用默认映射
+		if a.Platform == domain.PlatformKimi {
+			return domain.DefaultKimiModelMapping
+		}
+		// MiMo 平台使用默认映射
+		if a.Platform == domain.PlatformMiMo {
+			return domain.DefaultMiMoModelMapping
+		}
+		// 注意：OpenAI 平台不在此处挂默认 mapping。
+		// OpenAI 平台的 model_mapping 充当"支持模型白名单"语义（空 = 支持全部 gpt-*），
+		// 强加 claude-* 默认会让 OpenAI 协议入站调度判定"不支持 gpt-*"。
+		// Anthropic 协议入站时（forwardAsAnthropic）的 claude-* → gpt-* fallback 由协议转换层处理。
 		// Bedrock 默认映射由 forwardBedrock 统一处理（需配合 region prefix 调整）
 		return nil
 	}
@@ -489,6 +505,18 @@ func (a *Account) resolveModelMapping(rawMapping map[string]any) map[string]stri
 		// Antigravity 平台使用默认映射
 		if a.Platform == domain.PlatformAntigravity {
 			return domain.DefaultAntigravityModelMapping
+		}
+		// DeepSeek 平台使用默认映射
+		if a.Platform == domain.PlatformDeepSeek {
+			return domain.DefaultDeepSeekModelMapping
+		}
+		// Kimi 平台使用默认映射
+		if a.Platform == domain.PlatformKimi {
+			return domain.DefaultKimiModelMapping
+		}
+		// MiMo 平台使用默认映射
+		if a.Platform == domain.PlatformMiMo {
+			return domain.DefaultMiMoModelMapping
 		}
 		return nil
 	}
@@ -513,6 +541,14 @@ func (a *Account) resolveModelMapping(rawMapping map[string]any) map[string]stri
 	// Antigravity 平台使用默认映射
 	if a.Platform == domain.PlatformAntigravity {
 		return domain.DefaultAntigravityModelMapping
+	}
+	// DeepSeek 平台使用默认映射
+	if a.Platform == domain.PlatformDeepSeek {
+		return domain.DefaultDeepSeekModelMapping
+	}
+	// Kimi 平台使用默认映射
+	if a.Platform == domain.PlatformKimi {
+		return domain.DefaultKimiModelMapping
 	}
 	return nil
 }
@@ -725,6 +761,18 @@ func (a *Account) GetBaseURL() string {
 	}
 	baseURL := a.GetCredential("base_url")
 	if baseURL == "" {
+		// DeepSeek 平台默认走 Anthropic 兼容 endpoint
+		if a.Platform == PlatformDeepSeek {
+			return domain.DeepSeekDefaultBaseURL
+		}
+		// Kimi 平台默认走 Anthropic 兼容 endpoint
+		if a.Platform == PlatformKimi {
+			return domain.KimiDefaultBaseURL
+		}
+		// MiMo 平台默认走 Anthropic 兼容 endpoint
+		if a.Platform == PlatformMiMo {
+			return domain.MiMoDefaultBaseURL
+		}
 		return "https://api.anthropic.com"
 	}
 	if a.Platform == PlatformAntigravity {

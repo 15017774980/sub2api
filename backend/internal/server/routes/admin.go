@@ -295,6 +295,8 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 		// Antigravity 默认模型映射
 		accounts.GET("/antigravity/default-model-mapping", h.Admin.Account.GetAntigravityDefaultModelMapping)
+		// OpenAI 默认模型映射（codex 系列，用于 ChatGPT Plus 订阅）
+		accounts.GET("/openai/default-model-mapping", h.Admin.Account.GetOpenAIDefaultModelMapping)
 
 		// Claude OAuth routes
 		accounts.POST("/generate-auth-url", h.Admin.OAuth.GenerateAuthURL)

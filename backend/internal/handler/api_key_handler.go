@@ -103,7 +103,9 @@ func (h *APIKeyHandler) List(c *gin.Context) {
 
 	out := make([]dto.APIKey, 0, len(keys))
 	for i := range keys {
-		out = append(out, *dto.APIKeyFromService(&keys[i]))
+		k := dto.APIKeyFromService(&keys[i])
+		disguiseDTOAPIKey(k)
+		out = append(out, *k)
 	}
 	response.Paginated(c, out, result.Total, page, pageSize)
 }
@@ -135,7 +137,9 @@ func (h *APIKeyHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.APIKeyFromService(key))
+	out := dto.APIKeyFromService(key)
+	disguiseDTOAPIKey(out)
+	response.Success(c, out)
 }
 
 // Create handles creating a new API key
@@ -179,7 +183,9 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 		if err != nil {
 			return nil, err
 		}
-		return dto.APIKeyFromService(key), nil
+		out := dto.APIKeyFromService(key)
+		disguiseDTOAPIKey(out)
+		return out, nil
 	})
 }
 
@@ -243,7 +249,9 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.APIKeyFromService(key))
+	out := dto.APIKeyFromService(key)
+	disguiseDTOAPIKey(out)
+	response.Success(c, out)
 }
 
 // Delete handles deleting an API key
@@ -287,7 +295,9 @@ func (h *APIKeyHandler) GetAvailableGroups(c *gin.Context) {
 
 	out := make([]dto.Group, 0, len(groups))
 	for i := range groups {
-		out = append(out, *dto.GroupFromService(&groups[i]))
+		g := dto.GroupFromService(&groups[i])
+		disguiseDTOGroupPlatform(g)
+		out = append(out, *g)
 	}
 	response.Success(c, out)
 }

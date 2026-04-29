@@ -56,7 +56,9 @@ func (h *RedeemHandler) Redeem(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.RedeemCodeFromService(result))
+	out := dto.RedeemCodeFromService(result)
+	disguiseDTORedeemCode(out)
+	response.Success(c, out)
 }
 
 // GetHistory returns the user's redemption history
@@ -79,7 +81,9 @@ func (h *RedeemHandler) GetHistory(c *gin.Context) {
 
 	out := make([]dto.RedeemCode, 0, len(codes))
 	for i := range codes {
-		out = append(out, *dto.RedeemCodeFromService(&codes[i]))
+		r := dto.RedeemCodeFromService(&codes[i])
+		disguiseDTORedeemCode(r)
+		out = append(out, *r)
 	}
 	response.Success(c, out)
 }

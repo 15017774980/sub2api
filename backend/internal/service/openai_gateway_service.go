@@ -3929,6 +3929,9 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		upstreamMsg = fmt.Sprintf("Upstream error: %d", resp.StatusCode)
 	}
 	upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
+	// OpenAI 上游身份伪装：清洗 upstreamMsg，命中 leak 即替换为通用文案。
+	// 仅 ForwardAsAnthropic 路径（已 set OpenAI disguise context）生效，纯 chat completions 路径 no-op。
+	upstreamMsg = MaybeDisguiseOpenAIErrorMessage(c, upstreamMsg)
 
 	upstreamDetail := ""
 	if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {

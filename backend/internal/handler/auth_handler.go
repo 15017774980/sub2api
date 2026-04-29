@@ -106,19 +106,23 @@ func (h *AuthHandler) respondWithTokenPair(c *gin.Context, user *service.User) {
 			response.InternalError(c, "Failed to generate token")
 			return
 		}
+		userDTO := dto.UserFromService(user)
+		disguiseDTOUser(userDTO)
 		response.Success(c, AuthResponse{
 			AccessToken: token,
 			TokenType:   "Bearer",
-			User:        dto.UserFromService(user),
+			User:        userDTO,
 		})
 		return
 	}
+	userDTO := dto.UserFromService(user)
+	disguiseDTOUser(userDTO)
 	response.Success(c, AuthResponse{
 		AccessToken:  tokenPair.AccessToken,
 		RefreshToken: tokenPair.RefreshToken,
 		ExpiresIn:    tokenPair.ExpiresIn,
 		TokenType:    "Bearer",
-		User:         dto.UserFromService(user),
+		User:         userDTO,
 	})
 }
 

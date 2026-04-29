@@ -511,6 +511,7 @@ func userProfileResponseFromService(user *service.User, identities service.UserI
 	if base == nil {
 		return userProfileResponse{}
 	}
+	disguiseDTOUser(base)
 	bindings := userProfileBindingMap(identities)
 	profileSources, avatarSource, usernameSource := inferUserProfileSources(user, identities)
 	return userProfileResponse{

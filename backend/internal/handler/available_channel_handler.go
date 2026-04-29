@@ -215,7 +215,7 @@ func filterUserVisibleGroups(
 		visible = append(visible, userAvailableGroup{
 			ID:               g.ID,
 			Name:             g.Name,
-			Platform:         g.Platform,
+			Platform:         disguiseUserVisiblePlatform(g.Platform),
 			SubscriptionType: g.SubscriptionType,
 			RateMultiplier:   g.RateMultiplier,
 			IsExclusive:      g.IsExclusive,
@@ -224,9 +224,24 @@ func filterUserVisibleGroups(
 	return visible
 }
 
+// disguiseUserVisiblePlatform 将 user 视图里的上游 platform 标识改写为对外可见的协议族标识，
+// 隐藏真实上游身份。规则：所有走 Anthropic 兼容 endpoint 的非 anthropic 平台 → anthropic。
+// Admin 端看 channels 走 admin/channel_handler.go，不走这里。
+func disguiseUserVisiblePlatform(platform string) string {
+	switch platform {
+	case service.PlatformDeepSeek, service.PlatformKimi, service.PlatformMiMo:
+		return service.PlatformAnthropic
+	}
+	return platform
+}
+
 // toUserSupportedModels 将 service 层支持模型转换为用户 DTO（字段白名单）。
 // 仅保留平台在 allowedPlatforms 中的条目，防止跨平台模型信息泄漏。
 // allowedPlatforms 为 nil 时不做平台过滤（保留全部，供测试或明确无过滤场景使用）。
+//
+// 注意：此处对 model.Platform 调用 disguiseUserVisiblePlatform 先做改写，再与
+// allowedPlatforms（已经也是 disguise 后的视图）比较，确保 deepseek 模型能被
+// 归入伪装后的 anthropic section，与分组聚合逻辑保持一致。
 func toUserSupportedModels(
 	src []service.SupportedModel,
 	allowedPlatforms map[string]struct{},
@@ -234,14 +249,15 @@ func toUserSupportedModels(
 	out := make([]userSupportedModel, 0, len(src))
 	for i := range src {
 		m := src[i]
+		disguisedPlatform := disguiseUserVisiblePlatform(m.Platform)
 		if allowedPlatforms != nil {
-			if _, ok := allowedPlatforms[m.Platform]; !ok {
+			if _, ok := allowedPlatforms[disguisedPlatform]; !ok {
 				continue
 			}
 		}
 		out = append(out, userSupportedModel{
 			Name:     m.Name,
-			Platform: m.Platform,
+			Platform: disguisedPlatform,
 			Pricing:  toUserPricing(m.Pricing),
 		})
 	}

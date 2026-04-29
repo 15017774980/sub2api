@@ -85,7 +85,8 @@ func DeriveUpstreamEndpoint(inbound, rawRequestPath, platform string) string {
 		}
 		return EndpointResponses
 
-	case service.PlatformAnthropic:
+	case service.PlatformAnthropic, service.PlatformDeepSeek, service.PlatformKimi, service.PlatformMiMo:
+		// DeepSeek / Kimi / MiMo 走 Anthropic 兼容 endpoint，路由复用 EndpointMessages
 		return EndpointMessages
 
 	case service.PlatformGemini:

@@ -151,3 +151,42 @@ func TestUsageLogFromService_FallsBackToLegacyModelWhenRequestedModelMissing(t *
 func f64Ptr(value float64) *float64 {
 	return &value
 }
+
+func TestUsageLogFromService_StripsDeepSeekModelLeakInUserDTO(t *testing.T) {
+	t.Parallel()
+
+	// 旧记录 RequestedModel 为空，l.Model 是 deepseek 真模型名（异常落库）—— user DTO 必须不返回 deepseek-*
+	upstream := "deepseek-v4-flash"
+	leak := &service.UsageLog{
+		RequestID:     "req_leak",
+		Model:         "deepseek-v4-flash",
+		UpstreamModel: &upstream, // admin 通过该字段看真上游模型
+	}
+	userDTO := UsageLogFromService(leak)
+	require.NotContains(t, userDTO.Model, "deepseek")
+	require.Equal(t, "", userDTO.Model, "leaking model name should be cleared")
+
+	// admin DTO 嵌套了 user mapper（Model 字段共用），UpstreamModel 单独保留真值供排障
+	adminDTO := UsageLogFromServiceAdmin(leak)
+	require.Equal(t, "", adminDTO.Model, "shared mapper also clears Model — admin uses UpstreamModel")
+	require.NotNil(t, adminDTO.UpstreamModel)
+	require.Equal(t, "deepseek-v4-flash", *adminDTO.UpstreamModel)
+
+	// 正常情况：RequestedModel 已填，user DTO 用 RequestedModel，不动
+	normal := &service.UsageLog{
+		RequestID:      "req_ok",
+		Model:          "deepseek-v4-flash", // 上游真模型
+		RequestedModel: "claude-sonnet-4-5", // 客户端原始请求
+	}
+	userDTO = UsageLogFromService(normal)
+	require.Equal(t, "claude-sonnet-4-5", userDTO.Model)
+}
+
+func TestDisguiseUserModelLeak(t *testing.T) {
+	t.Parallel()
+	require.True(t, disguiseUserModelLeak("deepseek-v4-flash"))
+	require.True(t, disguiseUserModelLeak("DeepSeek-V4-Pro"))
+	require.False(t, disguiseUserModelLeak("claude-sonnet-4-5"))
+	require.False(t, disguiseUserModelLeak("gpt-5.3"))
+	require.False(t, disguiseUserModelLeak(""))
+}

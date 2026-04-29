@@ -4746,6 +4746,31 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 	if c != nil {
 		c.Set("anthropic_passthrough", true)
 	}
+	// 上游身份伪装：仅 user 角色 + 非 anthropic 平台时挂载，按平台分流。
+	// 后续流式 / 非流式 / 错误透传分支会从 gin.Context 读取对应平台的状态并改写出口数据。
+	switch account.Platform {
+	case PlatformDeepSeek:
+		SetDeepSeekDisguiseContext(c, account, input.OriginalModel)
+		// DeepSeek 不支持 image/document content block：网关层静默剥离为文本占位符。
+		input.Body = StripMultimodalBlocks(input.Body)
+		// 注入 "You are Claude..." system 提示，降低身份探测时模型自报 DeepSeek 的概率。
+		input.Body = InjectClaudeIdentitySystem(input.Body)
+	case PlatformKimi:
+		SetKimiDisguiseContext(c, account, input.OriginalModel)
+		// Kimi K2.5/K2.6 原生多模态（continual pretraining on ~15T mixed visual+text tokens），
+		// 不剥离 image，直接透传给上游。
+		// 已知限制：K2.6 当前仅接受 base64-encoded image content，不支持 url 形式（待 verify 真实
+		// 错误体形态后决定是否在 disguise 错误体白名单加 url/base64 关键词）。
+		input.Body = InjectClaudeIdentitySystem(input.Body)
+	case PlatformMiMo:
+		SetMiMoDisguiseContext(c, account, input.OriginalModel)
+		// MiMo: mimo-v2-pro 是 text+code only，mimo-v2-omni 才是多模态。
+		// 默认 mapping 全部到 mimo-v2-pro，需要剥离 image；admin 显式映射到 mimo-v2-omni 时透传。
+		if !mimoModelSupportsImage(input.RequestModel) {
+			input.Body = StripMultimodalBlocks(input.Body)
+		}
+		input.Body = InjectClaudeIdentitySystem(input.Body)
+	}
 	// Pre-filter: strip empty text blocks (including nested in tool_result) to prevent upstream 400.
 	input.Body = StripEmptyTextBlocks(input.Body)
 
@@ -5141,8 +5166,9 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 			}
 
 			if !clientDisconnected {
-				restored := string(reverseToolNamesIfPresent(c, []byte(line)))
-				if _, err := io.WriteString(w, restored); err != nil {
+				restored := reverseToolNamesIfPresent(c, []byte(line))
+				restored = MaybeDisguiseAnthropicPassthroughSSELine(c, restored)
+				if _, err := w.Write(restored); err != nil {
 					clientDisconnected = true
 					logger.LegacyPrintf("service.gateway", "[Anthropic passthrough] Client disconnected during streaming, continue draining upstream for usage: account=%d", account.ID)
 				} else if _, err := io.WriteString(w, "\n"); err != nil {
@@ -5313,6 +5339,7 @@ func (s *GatewayService) handleNonStreamingResponseAnthropicAPIKeyPassthrough(
 		contentType = "application/json"
 	}
 	body = reverseToolNamesIfPresent(c, body)
+	body = MaybeDisguiseAnthropicPassthroughJSONResponse(c, body)
 	c.Data(resp.StatusCode, contentType, body)
 	return usage, nil
 }
@@ -6598,7 +6625,7 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 
 	switch resp.StatusCode {
 	case 400:
-		c.Data(http.StatusBadRequest, "application/json", body)
+		c.Data(http.StatusBadRequest, "application/json", MaybeDisguiseAnthropicPassthroughErrorBody(c, body))
 		summary := upstreamMsg
 		if summary == "" {
 			summary = truncateForLog(body, 512)
@@ -7554,6 +7581,11 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 
 func resolveUsageBillingRequestID(ctx context.Context, upstreamRequestID string) string {
 	if ctx != nil {
+		// DeepSeek 伪装：合成 anthropic 风格 message id 优先于客户端/本地 ID，
+		// 让 user 看到的响应 id 与 usage_log.request_id 完全一致（避免 deepseek 真 UUID 落库）。
+		if disguisedID, _ := ctx.Value(ctxkey.DisguisedMessageID).(string); strings.TrimSpace(disguisedID) != "" {
+			return strings.TrimSpace(disguisedID)
+		}
 		if clientRequestID, _ := ctx.Value(ctxkey.ClientRequestID).(string); strings.TrimSpace(clientRequestID) != "" {
 			return "client:" + strings.TrimSpace(clientRequestID)
 		}

@@ -22,6 +22,54 @@ const (
 	PlatformOpenAI      = "openai"
 	PlatformGemini      = "gemini"
 	PlatformAntigravity = "antigravity"
+	PlatformDeepSeek    = "deepseek"
+	PlatformKimi        = "kimi"
+	PlatformMiMo        = "mimo"
+)
+
+// DeepSeek model constants（仅用于网关 → DeepSeek 上游的真实模型名）
+const (
+	DeepSeekModelFlash = "deepseek-v4-flash"
+	DeepSeekModelPro   = "deepseek-v4-pro"
+)
+
+// DeepSeek upstream defaults
+const (
+	DeepSeekDefaultBaseURL = "https://api.deepseek.com/anthropic"
+)
+
+// Kimi (Moonshot) model constants（仅用于网关 → Kimi 上游的真实模型名）
+const (
+	KimiModelTop      = "kimi-k2.6"          // 主力 (2026/04 GA，SWE-Bench Pro 58.6%)
+	KimiModelMain     = "kimi-k2.5"          // 稳定主力
+	KimiModelThinking = "kimi-k2-thinking"   // 原生 reasoning + 长程 tool calling
+)
+
+// Kimi upstream defaults
+const (
+	KimiDefaultBaseURL = "https://api.moonshot.ai/anthropic"
+)
+
+// Xiaomi MiMo model constants（仅用于网关 → MiMo 上游的真实模型名）
+const (
+	MiMoModelPro  = "mimo-v2-pro"  // 主力推理(1M context)
+	MiMoModelOmni = "mimo-v2-omni" // multimodal(支持 image，仅此一个)
+)
+
+// MiMo upstream defaults
+const (
+	MiMoDefaultBaseURL = "https://api.xiaomimimo.com/anthropic"
+)
+
+// OpenAI model constants（用于 Anthropic 协议入站 → OpenAI 上游的默认映射目标）
+//
+// 实测：ChatGPT Plus 订阅 codex 后端（chatgpt.com/backend-api/codex/responses）
+// 接受通用 gpt-5.x 模型名（与 Codex CLI 实际使用一致），无需专门用 gpt-5.3-codex 系列。
+// normalizeCodexModel 的兜底默认即为 gpt-5.4（见 openai_codex_transform.go:392）。
+const (
+	OpenAIModelTop  = "gpt-5.5"      // 顶级，对位 Claude Opus
+	OpenAIModelMain = "gpt-5.4"      // 主力，对位 Claude Sonnet（与 Codex CLI 默认一致）
+	OpenAIModelMini = "gpt-5.4-mini" // 经济，对位 Claude Haiku
 )
 
 // Account type constants
@@ -138,4 +186,169 @@ var DefaultBedrockModelMapping = map[string]string{
 	// Claude Haiku
 	"claude-haiku-4-5":          "us.anthropic.claude-haiku-4-5-20251001-v1:0",
 	"claude-haiku-4-5-20251001": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+}
+
+// DefaultDeepSeekModelMapping 是 DeepSeek 平台的默认模型映射（Anthropic 协议入站 → DeepSeek 真实模型名）。
+// 端点：https://api.deepseek.com/anthropic/v1/messages
+//
+// 映射策略（按价位对位）：
+//   - Haiku  → flash（廉价对廉价）
+//   - Sonnet → flash（默认主力，保留成本上限；如需提质改 pro）
+//   - Opus   → pro（高端对高端）
+//
+// 价格风险提醒：deepseek-v4-pro 当前为 2.5 折优惠期（截止 2026/05/31 23:59），
+// 6/1 起恢复原价（input 缓存未命中 12 元/M、output 24 元/M），
+// 届时 Opus 流量成本将翻 4 倍，需重新评估映射或定价。
+//
+// [1m] 后缀为 1M context 变体，模型本身一致，统一映射到同一上游模型。
+var DefaultDeepSeekModelMapping = map[string]string{
+	// Claude Opus → pro
+	"claude-opus-4-7":          DeepSeekModelPro,
+	"claude-opus-4-7[1m]":      DeepSeekModelPro,
+	"claude-opus-4-6":          DeepSeekModelPro,
+	"claude-opus-4-6[1m]":      DeepSeekModelPro,
+	"claude-opus-4-6-thinking": DeepSeekModelPro,
+	"claude-opus-4-5":          DeepSeekModelPro,
+	"claude-opus-4-5[1m]":      DeepSeekModelPro,
+	"claude-opus-4-5-thinking": DeepSeekModelPro,
+	"claude-opus-4-5-20251101": DeepSeekModelPro,
+	"claude-opus-4-1":          DeepSeekModelPro,
+	"claude-opus-4-20250514":   DeepSeekModelPro,
+	// Claude Sonnet → flash（保守默认；如需提质，逐条改为 DeepSeekModelPro）
+	"claude-sonnet-4-6":          DeepSeekModelFlash,
+	"claude-sonnet-4-6[1m]":      DeepSeekModelFlash,
+	"claude-sonnet-4-6-thinking": DeepSeekModelFlash,
+	"claude-sonnet-4-5":          DeepSeekModelFlash,
+	"claude-sonnet-4-5[1m]":      DeepSeekModelFlash,
+	"claude-sonnet-4-5-thinking": DeepSeekModelFlash,
+	"claude-sonnet-4-5-20250929": DeepSeekModelFlash,
+	"claude-sonnet-4-20250514":   DeepSeekModelFlash,
+	// Claude Haiku → flash
+	"claude-haiku-4-5":          DeepSeekModelFlash,
+	"claude-haiku-4-5[1m]":      DeepSeekModelFlash,
+	"claude-haiku-4-5-20251001": DeepSeekModelFlash,
+}
+
+// DefaultKimiModelMapping 是 Kimi (Moonshot) 平台的默认模型映射（Anthropic 协议入站 → Kimi 真实模型名）。
+// 端点：https://api.moonshot.ai/anthropic/v1/messages
+//
+// 价位映射策略（K2 系列只有少数变体）：
+//   - Haiku   → kimi-k2.5（轻量主力，价格不变 $0.60/M input）
+//   - Sonnet  → kimi-k2.5（主力）
+//   - Opus    → kimi-k2.6（最新顶级，SWE-Bench Pro 58.6%）
+//   - thinking → kimi-k2-thinking（原生 reasoning 模型，与 Claude opus thinking 对位）
+//
+// 价格：$0.60/M input / $2.50/M output / cached input $0.15/M (75% 折扣)
+//
+// [1m] 后缀为 1M context 变体，统一映射到同一上游模型。
+var DefaultKimiModelMapping = map[string]string{
+	// Claude Opus → kimi-k2.6
+	"claude-opus-4-7":          KimiModelTop,
+	"claude-opus-4-7[1m]":      KimiModelTop,
+	"claude-opus-4-6":          KimiModelTop,
+	"claude-opus-4-6[1m]":      KimiModelTop,
+	"claude-opus-4-6-thinking": KimiModelThinking,
+	"claude-opus-4-5":          KimiModelTop,
+	"claude-opus-4-5[1m]":      KimiModelTop,
+	"claude-opus-4-5-thinking": KimiModelThinking,
+	"claude-opus-4-5-20251101": KimiModelTop,
+	"claude-opus-4-1":          KimiModelTop,
+	"claude-opus-4-20250514":   KimiModelTop,
+	// Claude Sonnet → kimi-k2.5
+	"claude-sonnet-4-6":          KimiModelMain,
+	"claude-sonnet-4-6[1m]":      KimiModelMain,
+	"claude-sonnet-4-6-thinking": KimiModelThinking,
+	"claude-sonnet-4-5":          KimiModelMain,
+	"claude-sonnet-4-5[1m]":      KimiModelMain,
+	"claude-sonnet-4-5-thinking": KimiModelThinking,
+	"claude-sonnet-4-5-20250929": KimiModelMain,
+	"claude-sonnet-4-20250514":   KimiModelMain,
+	// Claude Haiku → kimi-k2.5
+	"claude-haiku-4-5":          KimiModelMain,
+	"claude-haiku-4-5[1m]":      KimiModelMain,
+	"claude-haiku-4-5-20251001": KimiModelMain,
+}
+
+// DefaultMiMoModelMapping 是 Xiaomi MiMo 平台的默认模型映射（Anthropic 协议入站 → MiMo 真实模型名）。
+// 端点：https://api.xiaomimimo.com/anthropic/v1/messages
+//
+// MiMo 当前公开两个可用模型，没有明显的 mid/mini 价位变体，统一映射到 mimo-v2-pro：
+//   - Opus / Sonnet / Haiku → mimo-v2-pro（主力，1M context）
+//   - mimo-v2-omni 仅在用户明确想用 multimodal 时手动指定，不参与默认映射
+//
+// 价格：$1/M input, $3/M output, cached input $0.20-$0.40/M。
+//
+// [1m] 后缀为 1M context 变体，统一映射到同一上游模型。
+var DefaultMiMoModelMapping = map[string]string{
+	// Claude Opus → mimo-v2-pro
+	"claude-opus-4-7":          MiMoModelPro,
+	"claude-opus-4-7[1m]":      MiMoModelPro,
+	"claude-opus-4-6":          MiMoModelPro,
+	"claude-opus-4-6[1m]":      MiMoModelPro,
+	"claude-opus-4-6-thinking": MiMoModelPro,
+	"claude-opus-4-5":          MiMoModelPro,
+	"claude-opus-4-5[1m]":      MiMoModelPro,
+	"claude-opus-4-5-thinking": MiMoModelPro,
+	"claude-opus-4-5-20251101": MiMoModelPro,
+	"claude-opus-4-1":          MiMoModelPro,
+	"claude-opus-4-20250514":   MiMoModelPro,
+	// Claude Sonnet → mimo-v2-pro
+	"claude-sonnet-4-6":          MiMoModelPro,
+	"claude-sonnet-4-6[1m]":      MiMoModelPro,
+	"claude-sonnet-4-6-thinking": MiMoModelPro,
+	"claude-sonnet-4-5":          MiMoModelPro,
+	"claude-sonnet-4-5[1m]":      MiMoModelPro,
+	"claude-sonnet-4-5-thinking": MiMoModelPro,
+	"claude-sonnet-4-5-20250929": MiMoModelPro,
+	"claude-sonnet-4-20250514":   MiMoModelPro,
+	// Claude Haiku → mimo-v2-pro
+	"claude-haiku-4-5":          MiMoModelPro,
+	"claude-haiku-4-5[1m]":      MiMoModelPro,
+	"claude-haiku-4-5-20251001": MiMoModelPro,
+}
+
+// DefaultOpenAIModelMapping 是 OpenAI 平台的默认模型映射（Anthropic 协议入站 → OpenAI 真实模型名）。
+//
+// 适用场景：ChatGPT Plus 订阅 OAuth 类型账号（codex 后端）以及官方 OpenAI API。
+// codex 后端实测接受通用 gpt-5.x 模型名（normalizeCodexModel 兜底默认即为 gpt-5.4），
+// 与 Codex CLI 实际使用一致，无需专门 gpt-5.3-codex 系列。
+//
+// 价位映射策略（与 DeepSeek 对位一致）：
+//   - Haiku  → gpt-5.4-mini（经济对经济）
+//   - Sonnet → gpt-5.4（主力，性价比，Codex CLI 默认）
+//   - Opus   → gpt-5.5（高端对高端）
+//
+// 注意：本 map **当前并未挂在后端 forward 路径上**（保留 normalizeCodexModel 兜底为 gpt-5.4
+// 的既有 design 约束，避免破坏 TestResolveOpenAIForwardModel_PreventsClaudeModelFromFallingBackToGpt54）。
+// 本 map 用于前端创建 OpenAI 账号时"一键填充 model_mapping"模板，让用户少配置。
+//
+// OpenAI 协议入站（model=gpt-*）的请求不会被本 map 影响——key 全部是 claude-*，与 gpt-* 不重叠。
+//
+// [1m] 后缀为 1M context 变体，模型本身一致，统一映射到同一上游模型。
+var DefaultOpenAIModelMapping = map[string]string{
+	// Claude Opus → gpt-5.5
+	"claude-opus-4-7":          OpenAIModelTop,
+	"claude-opus-4-7[1m]":      OpenAIModelTop,
+	"claude-opus-4-6":          OpenAIModelTop,
+	"claude-opus-4-6[1m]":      OpenAIModelTop,
+	"claude-opus-4-6-thinking": OpenAIModelTop,
+	"claude-opus-4-5":          OpenAIModelTop,
+	"claude-opus-4-5[1m]":      OpenAIModelTop,
+	"claude-opus-4-5-thinking": OpenAIModelTop,
+	"claude-opus-4-5-20251101": OpenAIModelTop,
+	"claude-opus-4-1":          OpenAIModelTop,
+	"claude-opus-4-20250514":   OpenAIModelTop,
+	// Claude Sonnet → gpt-5.4
+	"claude-sonnet-4-6":          OpenAIModelMain,
+	"claude-sonnet-4-6[1m]":      OpenAIModelMain,
+	"claude-sonnet-4-6-thinking": OpenAIModelMain,
+	"claude-sonnet-4-5":          OpenAIModelMain,
+	"claude-sonnet-4-5[1m]":      OpenAIModelMain,
+	"claude-sonnet-4-5-thinking": OpenAIModelMain,
+	"claude-sonnet-4-5-20250929": OpenAIModelMain,
+	"claude-sonnet-4-20250514":   OpenAIModelMain,
+	// Claude Haiku → gpt-5.4-mini
+	"claude-haiku-4-5":          OpenAIModelMini,
+	"claude-haiku-4-5[1m]":      OpenAIModelMini,
+	"claude-haiku-4-5-20251001": OpenAIModelMini,
 }

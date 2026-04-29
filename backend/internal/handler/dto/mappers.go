@@ -3,10 +3,23 @@ package dto
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
+
+// disguiseUserModelLeak 检测一个模型名是否会暴露非 Claude 上游身份。
+// 覆盖所有走 Anthropic 兼容 endpoint 的非 Claude 通道；新增上游时追加前缀。
+func disguiseUserModelLeak(model string) bool {
+	lower := strings.ToLower(model)
+	for _, prefix := range []string{"deepseek", "kimi", "moonshot", "mimo"} {
+		if strings.HasPrefix(lower, prefix) {
+			return true
+		}
+	}
+	return false
+}
 
 func UserFromServiceShallow(u *service.User) *User {
 	if u == nil {
@@ -562,6 +575,11 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 	requestedModel := l.RequestedModel
 	if requestedModel == "" {
 		requestedModel = l.Model
+	}
+	// L3 防御：兜底防止 deepseek-* 真模型名被回填到 user DTO（如旧记录 RequestedModel 为空、
+	// 或上游路径异常把 upstream model 写进了 l.Model）。命中即清空，前端按"未知模型"展示。
+	if disguiseUserModelLeak(requestedModel) {
+		requestedModel = ""
 	}
 	return UsageLog{
 		ID:                    l.ID,
