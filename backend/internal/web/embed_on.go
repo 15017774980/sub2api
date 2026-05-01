@@ -157,7 +157,10 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 		content := replaceNoncePlaceholder(cached.Content, nonce)
 
 		c.Header("ETag", cached.ETag)
-		c.Header("Cache-Control", "no-cache") // Must revalidate
+		// SPA 入口 HTML 必须永远拿最新版（含最新 __APP_CONFIG__ 注入），
+		// 否则浏览器 disk cache 可能返回缺失新增 feature-flag 字段的旧 HTML，
+		// 导致前端 stealth 等开关闪回 false。资源文件（hashed JS/CSS）不受影响。
+		c.Header("Cache-Control", "no-store, must-revalidate")
 		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 		c.Abort()
 		return
@@ -193,7 +196,7 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 	if cached != nil {
 		c.Header("ETag", cached.ETag)
 	}
-	c.Header("Cache-Control", "no-cache")
+	c.Header("Cache-Control", "no-store, must-revalidate")
 	c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 	c.Abort()
 }
