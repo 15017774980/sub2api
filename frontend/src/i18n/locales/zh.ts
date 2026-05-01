@@ -693,6 +693,12 @@ export default {
         codexCliWs: 'Codex CLI (WebSocket)',
         opencode: 'OpenCode'
       },
+      // Stealth 模式下使用的中性化 tab 标签（不暴露上游客户端品牌名）
+      stealthCliTabs: {
+        config: '配置 {n}'
+      },
+      stealthDescription: '将以下配置应用到您使用的客户端。',
+      stealthNote: '配置中的环境变量由客户端自动读取，请参考客户端文档；如需永久生效，请写入 shell 启动文件或客户端配置目录。',
       antigravity: {
         description: '为 Antigravity 分组配置 API 访问。请根据您使用的客户端选择对应的配置方式。',
         claudeCode: 'Claude Code',
@@ -5205,6 +5211,9 @@ export default {
         backendMode: 'Backend 模式',
         backendModeDescription:
           '禁用用户注册、公开页面和自助服务功能。仅管理员可以登录和管理平台。',
+        stealthMode: 'Stealth 隐身模式',
+        stealthModeDescription:
+          '对非管理员用户隐藏上游品牌（Anthropic/OpenAI/Gemini 等）与站点身份；侧边栏精简为「API 密钥 / 可用分组 / 兑换码 / 个人资料」4 个入口。管理员视图不受影响。',
         siteName: '站点名称',
         siteNameHint: '显示在邮件和页面标题中',
         siteNamePlaceholder: 'Sub2API',
@@ -6541,4 +6550,59 @@ export default {
     },
   },
 
+  // ===== Stealth 模式 (极简启动页 + 命令面板) =====
+  stealth: {
+    home: {
+      welcome: '欢迎回来，{name}',
+      balanceLabel: '当前余额',
+      groupLabel: '使用分组',
+      keyLabel: 'API 密钥',
+      generating: '正在生成…',
+      copy: '复制',
+      copied: '已复制',
+      copyFailed: '复制失败，请手动选择密钥文本。',
+      tutorial: '使用教程',
+      refresh: '刷新',
+      refreshConfirmTitle: '刷新 API 密钥？',
+      refreshConfirmMessage: '当前密钥将立即失效，正在使用旧密钥的客户端会断开。请确认后再继续。',
+      refreshed: '已生成新的 API 密钥。',
+      refreshFailed: '刷新失败，请稍后重试。',
+      redeemLabel: '兑换码',
+      redeemPlaceholder: '请输入兑换码',
+      redeem: '兑换',
+      redeemSuccess: '兑换成功。',
+      redeemFailed: '兑换失败，请检查兑换码是否有效。',
+      hint: '按 {shortcut} 唤起命令面板',
+      noGroups: '暂无可用分组，请联系管理员开通访问权限。',
+      loadFailed: '加载失败，请刷新页面重试。',
+      createFailed: '创建密钥失败，请稍后重试。',
+    },
+    userMenu: {
+      label: '用户菜单',
+      account: '账号设置',
+      signOut: '退出登录',
+    },
+    profile: {
+      title: '账号设置',
+    },
+    commandPalette: {
+      placeholder: '搜索命令或操作…',
+      empty: '没有匹配的命令',
+      current: '当前',
+      groups: {
+        actions: '快捷操作',
+        switchGroup: '切换分组',
+      },
+      commands: {
+        copyKey: '复制 API 密钥',
+        tutorial: '查看使用教程',
+        refresh: '刷新 API 密钥',
+        redeem: '兑换码',
+      },
+      hint: {
+        navigate: '上下选择',
+        select: '回车确认',
+      },
+    },
+  },
 }

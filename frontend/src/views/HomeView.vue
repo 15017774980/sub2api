@@ -17,8 +17,8 @@
     v-else
     class="relative flex min-h-screen flex-col overflow-hidden bg-gradient-to-br from-gray-50 via-primary-50/30 to-gray-100 dark:from-dark-950 dark:via-dark-900 dark:to-dark-950"
   >
-    <!-- Background Decorations -->
-    <div class="pointer-events-none absolute inset-0 overflow-hidden">
+    <!-- Background Decorations (stealth 模式下完全去除，保留极简灰底) -->
+    <div v-if="!stealthActive" class="pointer-events-none absolute inset-0 overflow-hidden">
       <div
         class="absolute -right-40 -top-40 h-96 w-96 rounded-full bg-primary-400/20 blur-3xl"
       ></div>
@@ -138,8 +138,8 @@
             </div>
           </div>
 
-          <!-- Right: Terminal Animation -->
-          <div class="flex flex-1 justify-center lg:justify-end">
+          <!-- Right: Terminal Animation (stealth 模式下隐藏：含 /v1/messages 暗示 Anthropic 协议) -->
+          <div v-if="!stealthActive" class="flex flex-1 justify-center lg:justify-end">
             <div class="terminal-container">
               <div class="terminal-window">
                 <!-- Window header -->
@@ -177,7 +177,7 @@
         </div>
 
         <!-- Feature Tags - Centered -->
-        <div class="mb-12 flex flex-wrap items-center justify-center gap-4 md:gap-6">
+        <div v-if="!stealthActive" class="mb-12 flex flex-wrap items-center justify-center gap-4 md:gap-6">
           <div
             class="inline-flex items-center gap-2.5 rounded-full border border-gray-200/50 bg-white/80 px-5 py-2.5 shadow-sm backdrop-blur-sm dark:border-dark-700/50 dark:bg-dark-800/80"
           >
@@ -205,7 +205,7 @@
         </div>
 
         <!-- Features Grid -->
-        <div class="mb-12 grid gap-6 md:grid-cols-3">
+        <div v-if="!stealthActive" class="mb-12 grid gap-6 md:grid-cols-3">
           <!-- Feature 1: Unified Gateway -->
           <div
             class="group rounded-2xl border border-gray-200/50 bg-white/60 p-6 backdrop-blur-sm transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/10 dark:border-dark-700/50 dark:bg-dark-800/60"
@@ -282,8 +282,8 @@
           </div>
         </div>
 
-        <!-- Supported Providers -->
-        <div class="mb-8 text-center">
+        <!-- Supported Providers (stealth 模式下隐藏：明文列出 Claude/GPT/Gemini 上游) -->
+        <div v-if="!stealthActive" class="mb-8 text-center">
           <h2 class="mb-3 text-2xl font-bold text-gray-900 dark:text-white">
             {{ t('home.providers.title') }}
           </h2>
@@ -292,7 +292,7 @@
           </p>
         </div>
 
-        <div class="mb-16 flex flex-wrap items-center justify-center gap-4">
+        <div v-if="!stealthActive" class="mb-16 flex flex-wrap items-center justify-center gap-4">
           <!-- Claude - Supported -->
           <div
             class="flex items-center gap-2 rounded-xl border border-primary-200 bg-white/60 px-5 py-3 ring-1 ring-primary-500/20 backdrop-blur-sm dark:border-primary-800 dark:bg-dark-800/60"
@@ -391,6 +391,7 @@
             {{ t('home.docs') }}
           </a>
           <a
+            v-if="!stealthActive"
             :href="githubUrl"
             target="_blank"
             rel="noopener noreferrer"
@@ -410,16 +411,21 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { useStealthMode } from '@/composables/useStealthMode'
 
 const { t } = useI18n()
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
+// HomeView 是登录前的访客落地页，无法判别 admin/user，只能用全局 stealth 开关。
+// 这里直接读 active：访客和已登录非管理员都看到极简版；admin 登录后再来访问也是
+// 极简版（管理员通常从 /admin/dashboard 而不是 /home 进入，影响很小）。
+const { active: stealthActive } = useStealthMode()
 
 // Site settings - directly from appStore (already initialized from injected config)
-const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
+const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'API Gateway')
 const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
-const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'AI API Gateway Platform')
+const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'API Gateway')
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
 

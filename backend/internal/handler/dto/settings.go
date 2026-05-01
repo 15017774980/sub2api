@@ -141,6 +141,9 @@ type SystemSettings struct {
 	// Backend Mode
 	BackendModeEnabled bool `json:"backend_mode_enabled"`
 
+	// Stealth Mode：对非管理员用户隐藏上游品牌与站点身份
+	StealthModeEnabled bool `json:"stealth_mode_enabled"`
+
 	// Gateway forwarding behavior
 	EnableFingerprintUnification bool `json:"enable_fingerprint_unification"`
 	EnableMetadataPassthrough    bool `json:"enable_metadata_passthrough"`
@@ -242,6 +245,7 @@ type PublicSettings struct {
 	OIDCOAuthProviderName            string           `json:"oidc_oauth_provider_name"`
 	SoraClientEnabled                bool             `json:"sora_client_enabled"`
 	BackendModeEnabled               bool             `json:"backend_mode_enabled"`
+	StealthModeEnabled               bool             `json:"stealth_mode_enabled"`
 	PaymentEnabled                   bool             `json:"payment_enabled"`
 	Version                          string           `json:"version"`
 	BalanceLowNotifyEnabled          bool             `json:"balance_low_notify_enabled"`

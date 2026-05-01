@@ -115,8 +115,8 @@
           </p>
         </div>
 
-        <!-- Invitation Code Input (Required when enabled) -->
-        <div v-if="invitationCodeEnabled">
+        <!-- Invitation Code Input (Required when enabled, hidden in stealth mode) -->
+        <div v-if="invitationCodeEnabled && !stealthActive">
           <label for="invitation_code" class="input-label">
             {{ t('auth.invitationCodeLabel') }}
           </label>
@@ -162,8 +162,8 @@
           </transition>
         </div>
 
-        <!-- Promo Code Input (Optional) -->
-        <div v-if="promoCodeEnabled">
+        <!-- Promo Code Input (Optional, hidden in stealth mode) -->
+        <div v-if="promoCodeEnabled && !stealthActive">
           <label for="promo_code" class="input-label">
             {{ t('auth.promoCodeLabel') }}
             <span class="ml-1 text-xs font-normal text-gray-400 dark:text-dark-500">({{ t('common.optional') }})</span>
@@ -285,6 +285,7 @@ import WechatOAuthSection from '@/components/auth/WechatOAuthSection.vue'
 import Icon from '@/components/icons/Icon.vue'
 import TurnstileWidget from '@/components/TurnstileWidget.vue'
 import { useAuthStore, useAppStore } from '@/stores'
+import { useStealthMode } from '@/composables/useStealthMode'
 import {
   getPublicSettings,
   isWeChatWebOAuthEnabled,
@@ -322,6 +323,8 @@ const showPassword = ref<boolean>(false)
 const registrationEnabled = ref<boolean>(true)
 const emailVerifyEnabled = ref<boolean>(false)
 const promoCodeEnabled = ref<boolean>(true)
+// Stealth：注册页隐藏 promo / 邀请码（公开页跟随 active 全局开关）
+const { active: stealthActive } = useStealthMode()
 const invitationCodeEnabled = ref<boolean>(false)
 const turnstileEnabled = ref<boolean>(false)
 const turnstileSiteKey = ref<string>('')

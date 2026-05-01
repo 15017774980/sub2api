@@ -1,5 +1,11 @@
 <template>
-  <AppLayout>
+  <!-- Stealth 用户进入这条路由时走极简布局 + 单 key 视图。
+       admin/非 stealth 用户保持现有 AppLayout 完整功能，零回归。 -->
+  <StealthShell v-if="isUserStealth" @open-account="profileModalOpen = true">
+    <StealthHomeContent />
+    <ProfileSettingsModal :show="profileModalOpen" @close="profileModalOpen = false" />
+  </StealthShell>
+  <AppLayout v-else>
     <TablePageLayout>
       <template #filters>
         <div class="flex flex-col gap-3">
@@ -1051,8 +1057,14 @@
 	import { useOnboardingStore } from '@/stores/onboarding'
 	import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { useStealthMode } from '@/composables/useStealthMode'
+import StealthShell from '@/components/layout/StealthShell.vue'
+import StealthHomeContent from '@/views/stealth/StealthHomeContent.vue'
+import ProfileSettingsModal from '@/components/stealth/ProfileSettingsModal.vue'
 
 const { t } = useI18n()
+const { isUserStealth } = useStealthMode()
+const profileModalOpen = ref(false)
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'

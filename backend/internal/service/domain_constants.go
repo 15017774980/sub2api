@@ -331,6 +331,11 @@ const (
 	// SettingKeyBackendModeEnabled Backend 模式：禁用用户注册和自助服务，仅管理员可登录
 	SettingKeyBackendModeEnabled = "backend_mode_enabled"
 
+	// SettingKeyStealthModeEnabled Stealth 模式：对非管理员用户隐藏上游品牌与
+	// 站点身份，仅暴露 API 密钥 / 可用分组 / 兑换码 / 个人资料 4 个入口。
+	// 详见 frontend/src/composables/useStealthMode.ts。
+	SettingKeyStealthModeEnabled = "stealth_mode_enabled"
+
 	// Gateway Forwarding Behavior
 	// SettingKeyEnableFingerprintUnification 是否统一 OAuth 账号的 X-Stainless-* 指纹头（默认 true）
 	SettingKeyEnableFingerprintUnification = "enable_fingerprint_unification"

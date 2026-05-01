@@ -148,6 +148,9 @@ type SystemSettings struct {
 	// Backend 模式：禁用用户注册和自助服务，仅管理员可登录
 	BackendModeEnabled bool
 
+	// Stealth 模式：对非管理员用户隐藏上游品牌与站点身份，仅暴露 4 个核心入口
+	StealthModeEnabled bool
+
 	// Gateway forwarding behavior
 	EnableFingerprintUnification bool // 是否统一 OAuth 账号的指纹头（默认 true）
 	EnableMetadataPassthrough    bool // 是否透传客户端原始 metadata（默认 false）
@@ -213,6 +216,7 @@ type PublicSettings struct {
 	WeChatOAuthMPEnabled     bool
 	WeChatOAuthMobileEnabled bool
 	BackendModeEnabled       bool
+	StealthModeEnabled       bool
 	PaymentEnabled           bool
 	OIDCOAuthEnabled         bool
 	OIDCOAuthProviderName    string

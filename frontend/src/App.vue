@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { RouterView, useRouter, useRoute } from 'vue-router'
-import { onMounted, onBeforeUnmount, watch } from 'vue'
+import { onMounted, onBeforeUnmount, watch, watchEffect } from 'vue'
 import Toast from '@/components/common/Toast.vue'
 import NavigationProgress from '@/components/common/NavigationProgress.vue'
 import { resolveDocumentTitle } from '@/router/title'
 import AnnouncementPopup from '@/components/common/AnnouncementPopup.vue'
 import { useAppStore, useAuthStore, useSubscriptionStore, useAnnouncementStore } from '@/stores'
 import { getSetupStatus } from '@/api/setup'
+import { useStealthMode } from '@/composables/useStealthMode'
 
 const router = useRouter()
 const route = useRoute()
@@ -14,6 +15,12 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const subscriptionStore = useSubscriptionStore()
 const announcementStore = useAnnouncementStore()
+const { isUserStealth } = useStealthMode()
+
+// stealth-user 根 class 控制全局 primary 调色板（admin 永远看不到）
+watchEffect(() => {
+  document.documentElement.classList.toggle('stealth-user', isUserStealth.value)
+})
 
 /**
  * Update favicon dynamically

@@ -5,26 +5,92 @@
         <tr class="border-b border-gray-100 bg-gray-50/50 text-xs font-medium uppercase tracking-wide text-gray-500 dark:border-dark-700 dark:bg-dark-800/50 dark:text-gray-400">
           <th class="w-[180px] px-4 py-3 text-center">{{ columns.name }}</th>
           <th class="w-[200px] px-4 py-3 text-left">{{ columns.description }}</th>
-          <th class="w-[140px] px-4 py-3 text-left">{{ columns.platform }}</th>
+          <th v-if="!compact" class="w-[140px] px-4 py-3 text-left">{{ columns.platform }}</th>
           <th class="px-4 py-3 text-left">{{ columns.groups }}</th>
-          <th class="px-4 py-3 text-left">{{ columns.supportedModels }}</th>
+          <th v-if="!compact" class="px-4 py-3 text-left">{{ columns.supportedModels }}</th>
         </tr>
       </thead>
       <tbody v-if="loading">
         <tr>
-          <td colspan="5" class="py-10 text-center">
+          <td :colspan="compact ? 3 : 5" class="py-10 text-center">
             <Icon name="refresh" size="lg" class="inline-block animate-spin text-gray-400" />
           </td>
         </tr>
       </tbody>
       <tbody v-else-if="rows.length === 0">
         <tr>
-          <td colspan="5" class="py-12 text-center">
+          <td :colspan="compact ? 3 : 5" class="py-12 text-center">
             <Icon name="inbox" size="xl" class="mx-auto mb-3 h-12 w-12 text-gray-400" />
             <p class="text-sm text-gray-500 dark:text-gray-400">{{ emptyLabel }}</p>
           </td>
         </tr>
       </tbody>
+      <!-- Compact 模式（stealth）：每个渠道单行，合并所有 platform 的 groups，
+           不渲染平台徽章列与支持模型列。完全屏蔽上游品牌信息。 -->
+      <tbody
+        v-else-if="compact"
+        v-for="(channel, chIdx) in rows"
+        :key="`compact-${channel.name}-${chIdx}`"
+        class="border-b border-gray-200 last:border-b-0 dark:border-dark-600"
+      >
+        <tr class="transition-colors hover:bg-gray-50/40 dark:hover:bg-dark-800/40">
+          <td class="px-4 py-3 text-center align-middle font-medium text-gray-900 dark:text-white">
+            {{ channel.name }}
+          </td>
+          <td class="px-4 py-3 align-middle text-xs text-gray-500 dark:text-gray-400">
+            <template v-if="channel.description">{{ channel.description }}</template>
+            <span v-else class="text-gray-400">-</span>
+          </td>
+          <td class="align-top px-4 py-3">
+            <div class="flex flex-col gap-1.5">
+              <div
+                v-if="compactExclusiveGroups(channel).length > 0"
+                class="flex flex-wrap items-center gap-1.5"
+              >
+                <span
+                  class="inline-flex items-center gap-0.5 text-[10px] font-medium uppercase text-purple-600 dark:text-purple-400"
+                  :title="t('availableChannels.exclusiveTooltip')"
+                >
+                  <Icon name="shield" size="xs" class="h-3 w-3" />
+                  {{ t('availableChannels.exclusive') }}
+                </span>
+                <GroupBadge
+                  v-for="g in compactExclusiveGroups(channel)"
+                  :key="`ex-${g.id}`"
+                  :name="g.name"
+                  :subscription-type="(g.subscription_type || 'standard') as SubscriptionType"
+                  :rate-multiplier="g.rate_multiplier"
+                  :user-rate-multiplier="userGroupRates[g.id] ?? null"
+                  always-show-rate
+                />
+              </div>
+              <div
+                v-if="compactPublicGroups(channel).length > 0"
+                class="flex flex-wrap items-center gap-1.5"
+              >
+                <span
+                  class="inline-flex items-center gap-0.5 text-[10px] font-medium uppercase text-gray-500 dark:text-gray-400"
+                  :title="t('availableChannels.publicTooltip')"
+                >
+                  <Icon name="globe" size="xs" class="h-3 w-3" />
+                  {{ t('availableChannels.public') }}
+                </span>
+                <GroupBadge
+                  v-for="g in compactPublicGroups(channel)"
+                  :key="`pub-${g.id}`"
+                  :name="g.name"
+                  :subscription-type="(g.subscription_type || 'standard') as SubscriptionType"
+                  :rate-multiplier="g.rate_multiplier"
+                  :user-rate-multiplier="userGroupRates[g.id] ?? null"
+                  always-show-rate
+                />
+              </div>
+              <span v-if="compactExclusiveGroups(channel).length === 0 && compactPublicGroups(channel).length === 0" class="text-xs text-gray-400">-</span>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+
       <!-- 每个渠道一个 tbody：首行 td rowspan 渠道名，后续行只渲染其余三列。
            tbody 之间强分隔线表达"渠道边界"，tbody 内部用淡分隔线区分平台。 -->
       <tbody
@@ -171,6 +237,11 @@ const props = defineProps<{
   emptyLabel: string
   /** 用户专属倍率（group_id → multiplier）；无专属时由 GroupBadge 仅显示默认倍率。 */
   userGroupRates: Record<number, number>
+  /**
+   * Compact (stealth) 模式：合并所有 platform 的 groups 到一行，
+   * 不渲染平台徽章列与支持模型列。用于隐身模式下完全屏蔽上游品牌信息。
+   */
+  compact?: boolean
 }>()
 
 // Suppress unused warning — props is accessed via template automatically but
@@ -185,5 +256,28 @@ function exclusiveGroups(section: UserChannelPlatformSection): UserAvailableGrou
 
 function publicGroups(section: UserChannelPlatformSection): UserAvailableGroup[] {
   return section.groups.filter((g) => !g.is_exclusive)
+}
+
+// Compact 模式辅助：把 channel 内所有 platform 的 groups 合并并按 id 去重，
+// 避免同一 group 跨 platform 重复出现。
+function compactGroups(channel: UserAvailableChannel): UserAvailableGroup[] {
+  const seen = new Set<number>()
+  const out: UserAvailableGroup[] = []
+  for (const section of channel.platforms) {
+    for (const g of section.groups) {
+      if (seen.has(g.id)) continue
+      seen.add(g.id)
+      out.push(g)
+    }
+  }
+  return out
+}
+
+function compactExclusiveGroups(channel: UserAvailableChannel): UserAvailableGroup[] {
+  return compactGroups(channel).filter((g) => g.is_exclusive)
+}
+
+function compactPublicGroups(channel: UserAvailableChannel): UserAvailableGroup[] {
+  return compactGroups(channel).filter((g) => !g.is_exclusive)
 }
 </script>

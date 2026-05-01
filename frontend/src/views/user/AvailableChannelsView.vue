@@ -42,6 +42,7 @@
           :no-pricing-label="t('availableChannels.noPricing')"
           :no-models-label="t('availableChannels.noModels')"
           :empty-label="t('availableChannels.empty')"
+          :compact="isUserStealth"
         />
       </template>
     </TablePageLayout>
@@ -59,9 +60,11 @@ import userChannelsAPI, { type UserAvailableChannel } from '@/api/channels'
 import userGroupsAPI from '@/api/groups'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import { useStealthMode } from '@/composables/useStealthMode'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const { isUserStealth } = useStealthMode()
 
 const channels = ref<UserAvailableChannel[]>([])
 const userGroupRates = ref<Record<number, number>>({})

@@ -693,6 +693,12 @@ export default {
         codexCliWs: 'Codex CLI (WebSocket)',
         opencode: 'OpenCode',
       },
+      // Neutral tab labels used in stealth mode (do not expose upstream client brand names)
+      stealthCliTabs: {
+        config: 'Config {n}',
+      },
+      stealthDescription: 'Apply the following configuration to your client.',
+      stealthNote: 'The environment variables in the configuration are read by the client automatically — refer to your client documentation. For persistent setup, add them to your shell rc file or the client config directory.',
       antigravity: {
         description: 'Configure API access for Antigravity group. Select the configuration method based on your client.',
         claudeCode: 'Claude Code',
@@ -5046,6 +5052,9 @@ export default {
         backendMode: 'Backend Mode',
         backendModeDescription:
           'Disables user registration, public site, and self-service features. Only admin can log in and manage the platform.',
+        stealthMode: 'Stealth Mode',
+        stealthModeDescription:
+          'Hide upstream brand names (Anthropic/OpenAI/Gemini etc.) and site identity from non-admin users. Sidebar is reduced to four entries: API Keys, Available Channels, Redeem, Profile. Admin view is unaffected.',
         siteName: 'Site Name',
         siteNamePlaceholder: 'Sub2API',
         siteNameHint: 'Displayed in emails and page titles',
@@ -6357,4 +6366,59 @@ export default {
     },
   },
 
+  // ===== Stealth mode (minimal launch page + command palette) =====
+  stealth: {
+    home: {
+      welcome: 'Welcome back, {name}',
+      balanceLabel: 'Balance',
+      groupLabel: 'Group',
+      keyLabel: 'API key',
+      generating: 'Generating…',
+      copy: 'Copy',
+      copied: 'Copied',
+      copyFailed: 'Copy failed — please select the key text manually.',
+      tutorial: 'Tutorial',
+      refresh: 'Refresh',
+      refreshConfirmTitle: 'Refresh API key?',
+      refreshConfirmMessage: 'The current key will be invalidated immediately. Any client still using the old key will be disconnected. Confirm to continue.',
+      refreshed: 'A new API key has been generated.',
+      refreshFailed: 'Refresh failed — please try again later.',
+      redeemLabel: 'Redeem code',
+      redeemPlaceholder: 'Enter redeem code',
+      redeem: 'Redeem',
+      redeemSuccess: 'Code redeemed.',
+      redeemFailed: 'Redeem failed — please verify the code is valid.',
+      hint: 'Press {shortcut} to open the command palette',
+      noGroups: 'No groups available. Please contact the administrator for access.',
+      loadFailed: 'Failed to load — please refresh the page.',
+      createFailed: 'Failed to create key — please try again later.',
+    },
+    userMenu: {
+      label: 'User menu',
+      account: 'Account settings',
+      signOut: 'Sign out',
+    },
+    profile: {
+      title: 'Account settings',
+    },
+    commandPalette: {
+      placeholder: 'Search commands or actions…',
+      empty: 'No matching commands',
+      current: 'Current',
+      groups: {
+        actions: 'Quick actions',
+        switchGroup: 'Switch group',
+      },
+      commands: {
+        copyKey: 'Copy API key',
+        tutorial: 'Show usage tutorial',
+        refresh: 'Refresh API key',
+        redeem: 'Redeem code',
+      },
+      hint: {
+        navigate: 'Navigate',
+        select: 'Select',
+      },
+    },
+  },
 }

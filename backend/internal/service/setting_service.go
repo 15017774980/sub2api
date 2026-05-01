@@ -444,6 +444,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyWeChatConnectRedirectURL,
 		SettingKeyWeChatConnectFrontendRedirectURL,
 		SettingKeyBackendModeEnabled,
+		SettingKeyStealthModeEnabled,
 		SettingPaymentEnabled,
 		SettingKeyOIDCConnectEnabled,
 		SettingKeyOIDCConnectProviderName,
@@ -530,6 +531,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		WeChatOAuthMPEnabled:             weChatMPEnabled,
 		WeChatOAuthMobileEnabled:         weChatMobileEnabled,
 		BackendModeEnabled:               settings[SettingKeyBackendModeEnabled] == "true",
+		StealthModeEnabled:               settings[SettingKeyStealthModeEnabled] == "true",
 		PaymentEnabled:                   settings[SettingPaymentEnabled] == "true",
 		OIDCOAuthEnabled:                 oidcEnabled,
 		OIDCOAuthProviderName:            oidcProviderName,
@@ -677,6 +679,7 @@ type PublicSettingsInjectionPayload struct {
 	OIDCOAuthEnabled                 bool            `json:"oidc_oauth_enabled"`
 	OIDCOAuthProviderName            string          `json:"oidc_oauth_provider_name"`
 	BackendModeEnabled               bool            `json:"backend_mode_enabled"`
+	StealthModeEnabled               bool            `json:"stealth_mode_enabled"`
 	PaymentEnabled                   bool            `json:"payment_enabled"`
 	Version                          string          `json:"version"`
 	BalanceLowNotifyEnabled          bool            `json:"balance_low_notify_enabled"`
@@ -733,6 +736,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		OIDCOAuthEnabled:                 settings.OIDCOAuthEnabled,
 		OIDCOAuthProviderName:            settings.OIDCOAuthProviderName,
 		BackendModeEnabled:               settings.BackendModeEnabled,
+		StealthModeEnabled:               settings.StealthModeEnabled,
 		PaymentEnabled:                   settings.PaymentEnabled,
 		Version:                          s.version,
 		BalanceLowNotifyEnabled:          settings.BalanceLowNotifyEnabled,
@@ -1240,6 +1244,9 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 
 	// Backend Mode
 	updates[SettingKeyBackendModeEnabled] = strconv.FormatBool(settings.BackendModeEnabled)
+
+	// Stealth Mode
+	updates[SettingKeyStealthModeEnabled] = strconv.FormatBool(settings.StealthModeEnabled)
 
 	// Gateway forwarding behavior
 	updates[SettingKeyEnableFingerprintUnification] = strconv.FormatBool(settings.EnableFingerprintUnification)
@@ -1925,6 +1932,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		CustomMenuItems:                  settings[SettingKeyCustomMenuItems],
 		CustomEndpoints:                  settings[SettingKeyCustomEndpoints],
 		BackendModeEnabled:               settings[SettingKeyBackendModeEnabled] == "true",
+		StealthModeEnabled:               settings[SettingKeyStealthModeEnabled] == "true",
 	}
 	result.TableDefaultPageSize, result.TablePageSizeOptions = parseTablePreferences(
 		settings[SettingKeyTableDefaultPageSize],

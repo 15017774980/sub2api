@@ -5,8 +5,8 @@
       class="absolute inset-0 bg-gradient-to-br from-gray-50 via-primary-50/30 to-gray-100 dark:from-dark-950 dark:via-dark-900 dark:to-dark-950"
     ></div>
 
-    <!-- Decorative Elements -->
-    <div class="pointer-events-none absolute inset-0 overflow-hidden">
+    <!-- Decorative Elements (stealth 模式下完全去除，保留极简灰底) -->
+    <div v-if="!stealthActive" class="pointer-events-none absolute inset-0 overflow-hidden">
       <!-- Gradient Orbs -->
       <div
         class="absolute -right-40 -top-40 h-80 w-80 rounded-full bg-primary-400/20 blur-3xl"
@@ -66,12 +66,15 @@
 import { computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores'
 import { sanitizeUrl } from '@/utils/url'
+import { useStealthMode } from '@/composables/useStealthMode'
 
 const appStore = useAppStore()
+// 公开页（pre-auth）无 admin 概念，跟随全局 stealth 开关
+const { active: stealthActive } = useStealthMode()
 
-const siteName = computed(() => appStore.siteName || 'Sub2API')
+const siteName = computed(() => appStore.siteName || 'API Gateway')
 const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
-const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'Subscription to API Conversion Platform')
+const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || '')
 const settingsLoaded = computed(() => appStore.publicSettingsLoaded)
 
 const currentYear = computed(() => new Date().getFullYear())

@@ -206,6 +206,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		MaxClaudeCodeVersion:                   settings.MaxClaudeCodeVersion,
 		AllowUngroupedKeyScheduling:            settings.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:                     settings.BackendModeEnabled,
+		StealthModeEnabled:                     settings.StealthModeEnabled,
 		EnableFingerprintUnification:           settings.EnableFingerprintUnification,
 		EnableMetadataPassthrough:              settings.EnableMetadataPassthrough,
 		EnableCCHSigning:                       settings.EnableCCHSigning,
@@ -439,6 +440,9 @@ type UpdateSettingsRequest struct {
 
 	// Backend Mode
 	BackendModeEnabled bool `json:"backend_mode_enabled"`
+
+	// Stealth Mode：对非管理员用户隐藏上游品牌与站点身份
+	StealthModeEnabled bool `json:"stealth_mode_enabled"`
 
 	// Gateway forwarding behavior
 	EnableFingerprintUnification *bool `json:"enable_fingerprint_unification"`
@@ -1231,6 +1235,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		MaxClaudeCodeVersion:             req.MaxClaudeCodeVersion,
 		AllowUngroupedKeyScheduling:      req.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:               req.BackendModeEnabled,
+		StealthModeEnabled:               req.StealthModeEnabled,
 		OpsMonitoringEnabled: func() bool {
 			if req.OpsMonitoringEnabled != nil {
 				return *req.OpsMonitoringEnabled
@@ -1567,6 +1572,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		MaxClaudeCodeVersion:                   updatedSettings.MaxClaudeCodeVersion,
 		AllowUngroupedKeyScheduling:            updatedSettings.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:                     updatedSettings.BackendModeEnabled,
+		StealthModeEnabled:                     updatedSettings.StealthModeEnabled,
 		EnableFingerprintUnification:           updatedSettings.EnableFingerprintUnification,
 		EnableMetadataPassthrough:              updatedSettings.EnableMetadataPassthrough,
 		EnableCCHSigning:                       updatedSettings.EnableCCHSigning,
@@ -1921,6 +1927,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.BackendModeEnabled != after.BackendModeEnabled {
 		changed = append(changed, "backend_mode_enabled")
+	}
+	if before.StealthModeEnabled != after.StealthModeEnabled {
+		changed = append(changed, "stealth_mode_enabled")
 	}
 	if before.PurchaseSubscriptionEnabled != after.PurchaseSubscriptionEnabled {
 		changed = append(changed, "purchase_subscription_enabled")

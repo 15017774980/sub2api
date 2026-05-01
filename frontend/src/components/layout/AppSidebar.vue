@@ -16,8 +16,8 @@
         <span class="sidebar-brand-title text-lg font-bold text-gray-900 dark:text-white">
           {{ siteName }}
         </span>
-        <!-- Version Badge -->
-        <VersionBadge :version="siteVersion" />
+        <!-- Version Badge: stealth 模式下隐藏，避免暴露版本号关联 Sub2Api -->
+        <VersionBadge v-if="!isUserStealth" :version="siteVersion" />
       </div>
     </div>
 
@@ -187,6 +187,7 @@ import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } 
 import VersionBadge from '@/components/common/VersionBadge.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
+import { useStealthMode } from '@/composables/useStealthMode'
 
 interface NavItem {
   path: string
@@ -232,6 +233,7 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
 const adminSettingsStore = useAdminSettingsStore()
+const { isUserStealth } = useStealthMode()
 
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
@@ -676,7 +678,15 @@ function finalizeNav(items: NavItem[]): NavItem[] {
 }
 
 // User navigation items (for regular users)
-const userNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems(true)))
+// stealth 模式下普通用户仅保留 4 个入口（API 密钥、可用分组、兑换码、个人资料），
+// 同时丢弃 admin 配置的 custom_menu_items（可能含上游/Sub2Api 字眼）。
+const STEALTH_USER_NAV_PATHS = new Set(['/keys', '/available-channels', '/redeem', '/profile'])
+const userNavItems = computed((): NavItem[] => {
+  if (isUserStealth.value) {
+    return buildSelfNavItems(false).filter(item => STEALTH_USER_NAV_PATHS.has(item.path))
+  }
+  return finalizeNav(buildSelfNavItems(true))
+})
 
 // Personal navigation items (for admin's "My Account" section, without Dashboard).
 // Admins access 可用渠道 from this section just like regular users — there is no

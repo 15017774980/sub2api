@@ -619,6 +619,13 @@ function isBackendModePublicRouteAllowed(path: string, hasPendingAuthSession: bo
   return false
 }
 
+// Stealth 模式下普通用户唯一允许的受保护路径 = /keys。
+// 所有功能（兑换、选用分组、复制 key、教程、刷新、profile）都已整合到 /keys
+// 这一个极简启动页里，靠 ⌘K 命令面板 + avatar dropdown 完成。
+// /home, /redeem, /available-channels, /profile, /usage, /dashboard 等全部
+// 重定向到 /keys —— 用户没有"切换回旧 UI"的退路（设计要求）。
+const STEALTH_USER_ALLOWED_PATHS = new Set(['/keys'])
+
 router.beforeEach((to, _from, next) => {
   // 开始导航加载状态
   navigationLoading.startNavigation()
@@ -697,6 +704,14 @@ router.beforeEach((to, _from, next) => {
     return
   }
 
+  // Stealth mode: 非管理员用户只允许访问 4 个核心入口 + /home。
+  // 其余受保护页面（dashboard / usage / subscriptions / orders 等）一律跳到 /keys。
+  if (appStore.stealthModeEnabled && !authStore.isAdmin) {
+    if (!STEALTH_USER_ALLOWED_PATHS.has(to.path)) {
+      next('/keys')
+      return
+    }
+  }
 
   // Check payment requirement (internal payment system only)
   if (to.meta.requiresPayment) {

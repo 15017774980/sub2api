@@ -5,8 +5,8 @@
       badgeClass
     ]"
   >
-    <!-- Platform logo -->
-    <PlatformIcon v-if="platform" :platform="platform" size="sm" />
+    <!-- Platform logo: stealth 模式下不渲染，避免暴露上游品牌 -->
+    <PlatformIcon v-if="platform && !isUserStealth" :platform="platform" size="sm" />
     <!-- Group name -->
     <span class="truncate">{{ name }}</span>
     <!-- Right side label -->
@@ -28,6 +28,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { SubscriptionType, GroupPlatform } from '@/types'
 import PlatformIcon from './PlatformIcon.vue'
+import { useStealthMode } from '@/composables/useStealthMode'
 
 interface Props {
   name: string
@@ -54,6 +55,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const { t } = useI18n()
+const { isUserStealth } = useStealthMode()
 
 const isSubscription = computed(() => props.subscriptionType === 'subscription')
 
@@ -97,6 +99,20 @@ const labelText = computed(() => {
 const labelClass = computed(() => {
   const base = 'px-1.5 py-0.5 rounded text-[10px] font-semibold'
 
+  // Stealth：所有 group label 统一中性灰；订阅剩余天数颜色信号也保留（红/橙），
+  // 因为这是和上游无关的"过期警示"，对用户有用且不暴露品牌。
+  if (isUserStealth.value) {
+    if (isSubscription.value && props.daysRemaining !== null && props.daysRemaining !== undefined) {
+      if (props.daysRemaining <= 0 || props.daysRemaining <= 3) {
+        return `${base} bg-red-200/80 text-red-800 dark:bg-red-800/50 dark:text-red-300`
+      }
+      if (props.daysRemaining <= 7) {
+        return `${base} bg-amber-200/80 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300`
+      }
+    }
+    return `${base} bg-black/10 dark:bg-white/10`
+  }
+
   if (!isSubscription.value) {
     // Standard: subtle background (不再为专属倍率使用不同的背景色)
     return `${base} bg-black/10 dark:bg-white/10`
@@ -129,6 +145,10 @@ const labelClass = computed(() => {
 
 // Badge color based on platform and subscription type
 const badgeClass = computed(() => {
+  // Stealth：所有 group 徽章统一 primary 配色，不再按 platform 染色
+  if (isUserStealth.value) {
+    return 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
+  }
   if (props.platform === 'anthropic') {
     // Claude: orange theme
     return isSubscription.value

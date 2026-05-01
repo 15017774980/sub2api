@@ -3527,6 +3527,21 @@
                 <Toggle v-model="form.backend_mode_enabled" />
               </div>
 
+              <!-- Stealth Mode -->
+              <div
+                class="flex items-center justify-between rounded-lg border border-purple-200 bg-purple-50 p-4 dark:border-purple-800 dark:bg-purple-900/20"
+              >
+                <div>
+                  <h3 class="text-sm font-medium text-gray-900 dark:text-white">
+                    {{ t("admin.settings.site.stealthMode") }}
+                  </h3>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.site.stealthModeDescription") }}
+                  </p>
+                </div>
+                <Toggle v-model="form.stealth_mode_enabled" />
+              </div>
+
               <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
                   <label
@@ -5686,6 +5701,7 @@ const form = reactive<SettingsForm>({
   doc_url: "",
   home_content: "",
   backend_mode_enabled: false,
+  stealth_mode_enabled: false,
   hide_ccs_import_button: false,
   payment_enabled: false,
   payment_min_amount: 1,
@@ -6330,6 +6346,7 @@ async function loadSettings() {
     }
     Object.assign(authSourceDefaults, buildAuthSourceDefaultsState(settings));
     form.backend_mode_enabled = settings.backend_mode_enabled;
+    form.stealth_mode_enabled = settings.stealth_mode_enabled ?? false;
     form.default_subscriptions = normalizeDefaultSubscriptionSettings(
       settings.default_subscriptions,
     );
@@ -6634,6 +6651,7 @@ async function saveSettings() {
       doc_url: form.doc_url,
       home_content: form.home_content,
       backend_mode_enabled: form.backend_mode_enabled,
+      stealth_mode_enabled: form.stealth_mode_enabled,
       hide_ccs_import_button: form.hide_ccs_import_button,
       table_default_page_size: form.table_default_page_size,
       table_page_size_options: form.table_page_size_options,
